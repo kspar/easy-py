@@ -31,7 +31,6 @@ def handle_response(resp: requests.Response, instance: Type[Callable]) -> Resp:
     if resp_code == 200:
         try:
             j: dict = resp.json()
-
             dto: Resp = instance(resp_code, resp, **j)
         except json.decoder.JSONDecodeError as e:
             raise ErrorResponseException(resp, e)
