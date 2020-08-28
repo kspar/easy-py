@@ -1,4 +1,3 @@
-import json
 import logging
 from dataclasses import dataclass
 
@@ -6,7 +5,6 @@ import requests
 
 import conf
 import util
-from exceptions import EmptyResponseException, ResponseCodeNot200Exception
 
 # TODO 1: add multithreading support for logging in threads
 # TODO 2: move logging conf to proper location
@@ -36,33 +34,18 @@ class Ez:
         self.root = conf.BASE_URL
 
     def get_exercise_details(self, course_id: str, course_exercise_id: str) -> ExerciseDetailsResp:
+        logging.debug(f"GET exercise details for course '{course_id}' exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
 
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
 
         resp: requests.Response = requests.get(path, headers=util.get_student_testing_header())
-        resp_code: int = resp.status_code
-
-        if resp_code == 200:
-            logging.debug(f"GET exercise details: {resp.status_code}")
-            try:
-                j: dict = resp.json()
-                dto: ExerciseDetailsResp = ExerciseDetailsResp(resp_code, resp,
-                                                               j["effective_title"],
-                                                               j["text_html"],
-                                                               j["deadline"],
-                                                               j["grader_type"],
-                                                               int(j["threshold"]),
-                                                               j["instructions_html"])
-            except json.decoder.JSONDecodeError as e:
-                raise EmptyResponseException(resp, e)
-            return dto
-        else:
-            logging.error(f"Exercise details returned: {resp}")
-            raise ResponseCodeNot200Exception(resp)
+        dto = util.handle_response(resp, ExerciseDetailsResp)
+        assert isinstance(dto, ExerciseDetailsResp)
+        return dto
 
 
 # TODO: rm after implementation
 if __name__ == '__main__':
     ez = Ez()
-    print(ez.get_exercise_details("1", "1").instructions_html)
+    print(ez.get_exercise_details("1", "2"))

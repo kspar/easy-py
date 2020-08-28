@@ -1,20 +1,22 @@
 from requests import Response
 
 
-class ResponseCodeNot200Exception(Exception):
-    def __init__(self, resp: Response):
+class ErrorResponseException(Exception):
+    def __init__(self, resp: Response, nested_exception: Exception = None):
         self.resp = resp
-        super().__init__(self.resp)
-
-    def __str__(self):
-        return f'Expected HTTP response code "200", but got "{self.resp.status_code}" : {self.resp.content}'
+        self.nested_ex = nested_exception
+        super().__init__(self.resp, nested_exception)
 
 
 class EmptyResponseException(Exception):
-    def __init__(self, resp: Response, super_exception: Exception):
+    def __init__(self, resp: Response, nested_exception: Exception = None):
         self.resp = resp
-        self.nested_exception = super_exception
+        self.nested_exception = nested_exception
         super().__init__(self.resp, self.nested_exception)
 
-    def __str__(self):
-        return f'Unexpected empty response. Nested exception: {self.nested_exception}'
+
+class ResponseMissingKeyException(Exception):
+    def __init__(self, resp: Response, nested_exception: Exception = None):
+        self.resp = resp
+        self.nested_exception = nested_exception
+        super().__init__(self.resp, self.nested_exception)
