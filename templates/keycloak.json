@@ -1,0 +1,10 @@
+{
+  "realm": "master",
+  "auth-server-url": "{{ idp_url }}/auth",
+  "ssl-required": "external",
+  "resource": "{{ client_name }}",
+  "public-client": true,
+  "verify-token-audience": true,
+  "use-resource-role-mappings": true,
+  "confidential-port": 0
+}

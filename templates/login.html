@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+
+<body>
+<div id="container"></div>
+
+
+<script src="{{ idp_url }}/auth/js/keycloak.js"></script>
+<script>
+
+    kc = Keycloak("http://127.0.0.1:{{ port }}/keycloak.json");
+    kc.init({
+        onLoad: 'login-required'
+
+    }).success((authenticated) => {
+        console.debug("Authenticated: " + authenticated);
+
+        const accessTokenValidSec = kc.tokenParsed.exp - kc.tokenParsed.iat;
+        console.debug("Access token valid for: " + accessTokenValidSec);
+
+        const tokenBody = {
+            access_token: kc.token,
+            access_token_valid_sec: accessTokenValidSec,
+            refresh_token: kc.refreshToken
+        };
+
+        const container = document.getElementById("container");
+
+        fetch("http://127.0.0.1:{{ port }}/deliver-tokens", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(tokenBody)
+        })
+            .then(response => {
+                if (response.ok) {
+                    container.textContent = "It's all good, man. You can now close this page.";
+                } else {
+                    container.textContent = "Something failed... did you try turning it off and on again?";
+                }
+            });
+
+    }).error(() => {
+        console.error("Keycloak init failed");
+        document.getElementById("container").textContent = "Authentication failed... did you try turning it off and on again?";
+    });
+
+</script>
+</body>
+</html>
