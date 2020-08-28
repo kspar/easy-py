@@ -1,5 +1,6 @@
 import json
 import logging
+from dataclasses import dataclass
 
 import requests
 
@@ -13,6 +14,16 @@ logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(format='%(asctime)s - %(message)s-%(levelname)s', level=logging.DEBUG)
 
 
+@dataclass
+class ExerciseDetailsResp:
+    effective_title: str = None,
+    text_html: str = None,
+    deadline: str = None,
+    grader_type: str = None,
+    threshold: int = None,
+    instructions_html: str = None
+
+
 class Ez:
     def __init__(self):
         self.is_auth = False
@@ -20,21 +31,6 @@ class Ez:
 
     def get_exercise_details(self, course_id: str, course_exercise_id: str):
         util.assert_not_none(course_id, course_exercise_id)
-
-        class ExerciseDetailsResp:
-            def __init__(self,
-                         effective_title: str = None,
-                         text_html: str = None,
-                         deadline: str = None,
-                         grader_type: str = None,
-                         threshold: int = None,
-                         instructions_html: str = None):
-                self.effective_title = effective_title
-                self.text_html = text_html
-                self.deadline = deadline
-                self.grader_type = grader_type
-                self.threshold = threshold
-                self.instructions_html = instructions_html
 
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
 
@@ -58,7 +54,7 @@ class Ez:
             raise ResponseCodeNot200Exception(exercise_details_resp)
 
 
-# TODO: extract, implement and format properly to allow cli access
+# TODO: rm after implementation
 if __name__ == '__main__':
     ez = Ez()
     resp = ez.get_exercise_details("1", "1")
