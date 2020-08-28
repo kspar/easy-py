@@ -3,7 +3,6 @@ import logging
 from dataclasses import dataclass
 
 import requests
-from requests.models import Response
 
 import conf
 import util
@@ -41,7 +40,7 @@ class Ez:
 
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
 
-        resp: Response = requests.get(path, headers=util.get_student_testing_header())
+        resp: requests.Response = requests.get(path, headers=util.get_student_testing_header())
         resp_code: int = resp.status_code
 
         if resp_code == 200:
