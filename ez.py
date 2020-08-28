@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass
 
 import requests
+from requests.models import Response
 
 import conf
 import util
@@ -15,7 +16,13 @@ logging.basicConfig(format='%(asctime)s - %(message)s-%(levelname)s', level=logg
 
 
 @dataclass
-class ExerciseDetailsResp:
+class Resp:
+    resp_code: int = None,
+    response: requests.Response = None
+
+
+@dataclass
+class ExerciseDetailsResp(Resp):
     effective_title: str = None,
     text_html: str = None,
     deadline: str = None,
@@ -29,33 +36,34 @@ class Ez:
         self.is_auth = False
         self.root = conf.BASE_URL
 
-    def get_exercise_details(self, course_id: str, course_exercise_id: str):
+    def get_exercise_details(self, course_id: str, course_exercise_id: str) -> ExerciseDetailsResp:
         util.assert_not_none(course_id, course_exercise_id)
 
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
 
-        exercise_details_resp = requests.get(path, headers=util.get_student_testing_header())
+        resp: Response = requests.get(path, headers=util.get_student_testing_header())
+        resp_code: int = resp.status_code
 
-        if exercise_details_resp.status_code == 200:
-            logging.debug(f"GET exercise details: {exercise_details_resp.status_code}")
+        if resp_code == 200:
+            logging.debug(f"GET exercise details: {resp.status_code}")
             try:
-                j = exercise_details_resp.json()
+                j: dict = resp.json()
+                dto: ExerciseDetailsResp = ExerciseDetailsResp(resp_code, resp,
+                                                               j["effective_title"],
+                                                               j["text_html"],
+                                                               j["deadline"],
+                                                               j["grader_type"],
+                                                               int(j["threshold"]),
+                                                               j["instructions_html"])
             except json.decoder.JSONDecodeError as e:
-                raise EmptyResponseException(exercise_details_resp, e)
-
-            return ExerciseDetailsResp(j["effective_title"],
-                                       j["text_html"],
-                                       j["deadline"],
-                                       j["grader_type"],
-                                       int(j["threshold"]),
-                                       j["instructions_html"])
+                raise EmptyResponseException(resp, e)
+            return dto
         else:
-            logging.error(f"Exercise details returned: {exercise_details_resp}")
-            raise ResponseCodeNot200Exception(exercise_details_resp)
+            logging.error(f"Exercise details returned: {resp}")
+            raise ResponseCodeNot200Exception(resp)
 
 
 # TODO: rm after implementation
 if __name__ == '__main__':
     ez = Ez()
-    resp = ez.get_exercise_details("1", "1")
-    print(resp.instructions_html)
+    print(ez.get_exercise_details("1", "1").instructions_html)
