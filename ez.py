@@ -40,7 +40,7 @@ class Ez:
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
 
         resp: requests.Response = requests.get(path, headers=util.get_student_testing_header())
-        dto = util.handle_response(resp, ExerciseDetailsResp)
+        dto = util.handle_response(resp, util.CodeToInstance(200, ExerciseDetailsResp))
         assert isinstance(dto, ExerciseDetailsResp)
         return dto
 
