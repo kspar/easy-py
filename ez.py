@@ -40,7 +40,8 @@ class Ez:
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
 
         resp: requests.Response = requests.get(path, headers=util.get_student_testing_header())
-        dto = util.handle_response(resp, util.CodeToInstance(200, ExerciseDetailsResp))
+
+        dto = util.handle_response({200: (resp, ExerciseDetailsResp)})[200]
         assert isinstance(dto, ExerciseDetailsResp)
         return dto
 
@@ -48,4 +49,4 @@ class Ez:
 # TODO: rm after implementation
 if __name__ == '__main__':
     ez = Ez()
-    print(ez.get_exercise_details("1", "2"))
+    print(ez.get_exercise_details("14", "2"))

@@ -1,9 +1,9 @@
 import json
-from typing import NamedTuple, Callable
+from typing import Callable, Dict, Type, Tuple
 
 import requests
 
-from exceptions import ErrorResponseException, ResponseMissingKeyException
+from exceptions import ErrorResponseException, ResponseMissingKeyException, ErrorResp
 from ez import Resp
 
 
@@ -25,22 +25,28 @@ def get_student_testing_header():
             "oidc_claim_preferred_username": "fp"}
 
 
-class CodeToInstance(NamedTuple):
-    expected_code: int
-    instance: Callable
+def handle_response(code_to_instance: Dict[int, Tuple[requests.Response, Type[Callable]]]) -> Dict[int, Resp]:
+    out = dict()
+    for expected_code, (resp, instance) in code_to_instance.items():
+        assert isinstance(expected_code, int)
+        assert isinstance(resp, requests.Response)
+        assert isinstance(instance, Callable)
 
-
-def handle_response(resp: requests.Response, code_to_instance: CodeToInstance) -> Resp:
-    resp_code: int = resp.status_code
-
-    if resp_code == code_to_instance.expected_code:
         try:
             j: dict = resp.json()
-            dto: Resp = code_to_instance.instance(resp_code, resp, **j)
         except json.decoder.JSONDecodeError as e:
-            raise ErrorResponseException(resp, e)
+            raise ErrorResponseException(resp, None, e)
+
+        try:
+            if expected_code == resp.status_code:
+                dto: Resp = instance(resp.status_code, resp, **j)
+                out[expected_code] = dto
+
+            else:
+                error_rsp: ErrorResp = ErrorResp(**j)
+                raise ErrorResponseException(resp, error_rsp)
+
         except KeyError as e:
             raise ResponseMissingKeyException(resp, e)
-        return dto
-    else:
-        raise ErrorResponseException(resp)
+
+    return out
