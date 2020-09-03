@@ -49,7 +49,7 @@ class AutogradeStatus(Enum):
 
 
 @dataclass
-class LatestSubmission(Resp):
+class Submission(Resp):
     id: str = None,
     solution: str = None
     submission_time: str = None
@@ -58,6 +58,12 @@ class LatestSubmission(Resp):
     feedback_auto: str = None
     grade_teacher: int = None
     feedback_teacher: str = None
+
+
+@dataclass
+class StudentAllSubmissionsResp(Resp):
+    submissions: List[Submission] = None,
+    count: int = None
 
 
 class Ez:
@@ -82,14 +88,23 @@ class Ez:
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
         return util.create_simple_get_request(path, ExerciseDetailsResp)
 
-    def get_latest_exercise_submission_details(self, course_id: str, course_exercise_id: str) -> LatestSubmission:
+    def get_latest_exercise_submission_details(self, course_id: str, course_exercise_id: str) -> Submission:
         """
         Get and wait for the latest submission's details to the specified course exercise.
         """
         logging.debug(f"GET latest submission's details to the '{course_id}' exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/latest/await"
-        return util.create_simple_get_request(path, LatestSubmission)
+        return util.create_simple_get_request(path, Submission)
+
+    def get_all_student_submissions(self, course_id: str, course_exercise_id: str) -> StudentAllSubmissionsResp:
+        """
+        Get submissions to this course exercise.
+        """
+        logging.debug(f" Get submissions to course '{course_id}' course exercise '{course_exercise_id}'")
+        util.assert_not_none(course_id, course_exercise_id)
+        path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/all"
+        return util.create_simple_get_request(path, StudentAllSubmissionsResp)
 
 
 # TODO: rm after implementation
@@ -97,4 +112,5 @@ if __name__ == '__main__':
     ez = Ez()
     # print(ez.get_my_courses())
     # print(ez.get_exercise_details("1", "1"))
-    print(ez.get_latest_exercise_submission_details("1", "1").autograde_status)
+    # print(ez.get_latest_exercise_submission_details("1", "1").autograde_status)
+    print(ez.get_all_student_submissions("1", "1"))
