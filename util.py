@@ -50,3 +50,10 @@ def handle_response(code_to_instance: Dict[int, Tuple[requests.Response, Type[Ca
             raise ResponseMissingKeyException(resp, e)
 
     return out
+
+
+def create_simple_get_request(path: str, instance: Callable):
+    resp: requests.Response = requests.get(path, headers=get_student_testing_header())
+    dto = handle_response({200: (resp, instance)})[200]
+    assert isinstance(dto, instance)
+    return dto
