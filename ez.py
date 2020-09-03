@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from enum import Enum
 from typing import List
 
 import requests
@@ -40,6 +41,25 @@ class StudentCourseResp(Resp):
     courses: List[StudentCourse] = None
 
 
+class AutogradeStatus(Enum):
+    NONE = "NONE"
+    IN_PROGRESS = "IN_PRGRESS"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+@dataclass
+class LatestSubmission(Resp):
+    id: str = None,
+    solution: str = None
+    submission_time: str = None
+    autograde_status: AutogradeStatus = None
+    grade_auto: int = None
+    feedback_auto: str = None
+    grade_teacher: int = None
+    feedback_teacher: str = None
+
+
 class Ez:
     def __init__(self):
         self.is_auth = False
@@ -62,9 +82,19 @@ class Ez:
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
         return util.create_simple_get_request(path, ExerciseDetailsResp)
 
+    def get_latest_exercise_submission_details(self, course_id: str, course_exercise_id: str) -> LatestSubmission:
+        """
+        Get and wait for the latest submission's details to the specified course exercise.
+        """
+        logging.debug(f"GET latest submission's details to the '{course_id}' exercise '{course_exercise_id}'")
+        util.assert_not_none(course_id, course_exercise_id)
+        path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/latest/await"
+        return util.create_simple_get_request(path, LatestSubmission)
+
 
 # TODO: rm after implementation
 if __name__ == '__main__':
     ez = Ez()
-    print(ez.get_my_courses())
-    print(ez.get_exercise_details("1", "1"))
+    # print(ez.get_my_courses())
+    # print(ez.get_exercise_details("1", "1"))
+    print(ez.get_latest_exercise_submission_details("1", "1").autograde_status)
