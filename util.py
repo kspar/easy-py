@@ -4,7 +4,7 @@ from typing import Callable, Dict, Type
 import requests
 
 from data import Resp
-from exceptions import ErrorResponseException, ResponseMissingKeyException, ErrorResp
+from exceptions import ErrorResponseException, ResponseMissingKeyException, ErrorResp, UnexpectedResponseException
 
 
 def contains_none(args):
@@ -39,7 +39,7 @@ def handle_response(resp: requests.Response, code_to_instance: Dict[int, Type[Ca
 
         else:
             error_rsp: ErrorResp = ErrorResp(**j)
-            raise ErrorResponseException(resp, error_rsp)
+            raise UnexpectedResponseException(resp, error_rsp)
 
     except KeyError as e:
         raise ResponseMissingKeyException(resp, e)

@@ -20,6 +20,14 @@ class ErrorResponseException(Exception):
         super().__init__(self.resp, error_resp, nested_exception)
 
 
+class UnexpectedResponseException(Exception):
+    def __init__(self, resp: Response, error_resp: ErrorResp = None, nested_exception: Exception = None):
+        self.resp = resp
+        self.error_resp = error_resp
+        self.nested_ex = nested_exception
+        super().__init__(self.resp, error_resp, nested_exception)
+
+
 class EmptyResponseException(Exception):
     def __init__(self, resp: Response, nested_exception: Exception = None):
         self.resp = resp
