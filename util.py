@@ -1,10 +1,10 @@
 import json
-from typing import Callable, Dict, Type, Tuple
+from typing import Callable, Dict, Type
 
 import requests
 
+from data import Resp
 from exceptions import ErrorResponseException, ResponseMissingKeyException, ErrorResp
-from ez import Resp
 
 
 def contains_none(args):
@@ -25,35 +25,28 @@ def get_student_testing_header():
             "oidc_claim_preferred_username": "fp"}
 
 
-def handle_response(code_to_instance: Dict[int, Tuple[requests.Response, Type[Callable]]]) -> Dict[int, Resp]:
-    out = dict()
-    for expected_code, (resp, instance) in code_to_instance.items():
-        assert isinstance(expected_code, int)
-        assert isinstance(resp, requests.Response)
-        assert isinstance(instance, Callable)
+def handle_response(resp: requests.Response, code_to_instance: Dict[int, Type[Callable]]) -> Resp:
+    try:
+        j: dict = resp.json()
+    except json.decoder.JSONDecodeError as e:
+        raise ErrorResponseException(resp, None, e)
 
-        try:
-            j: dict = resp.json()
-        except json.decoder.JSONDecodeError as e:
-            raise ErrorResponseException(resp, None, e)
+    try:
+        if resp.status_code in code_to_instance:
+            instance = code_to_instance[resp.status_code]
+            dto: Resp = instance(resp.status_code, resp, **j)
+            return dto
 
-        try:
-            if expected_code == resp.status_code:
-                dto: Resp = instance(resp.status_code, resp, **j)
-                out[expected_code] = dto
+        else:
+            error_rsp: ErrorResp = ErrorResp(**j)
+            raise ErrorResponseException(resp, error_rsp)
 
-            else:
-                error_rsp: ErrorResp = ErrorResp(**j)
-                raise ErrorResponseException(resp, error_rsp)
-
-        except KeyError as e:
-            raise ResponseMissingKeyException(resp, e)
-
-    return out
+    except KeyError as e:
+        raise ResponseMissingKeyException(resp, e)
 
 
 def create_simple_get_request(path: str, instance: Callable):
     resp: requests.Response = requests.get(path, headers=get_student_testing_header())
-    dto = handle_response({200: (resp, instance)})[200]
+    dto = handle_response(resp, {200: instance})
     assert isinstance(dto, instance)
     return dto
