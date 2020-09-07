@@ -1,3 +1,4 @@
+import dataclasses
 import json
 from typing import Callable, Dict, Type
 
@@ -45,8 +46,14 @@ def handle_response(resp: requests.Response, code_to_instance: Dict[int, Type[Ca
         raise ResponseMissingKeyException(resp, e)
 
 
-def create_simple_get_request(path: str, instance: Callable):
+def simple_get_request(path: str, instance: Callable):
     resp: requests.Response = requests.get(path, headers=get_student_testing_header())
     dto = handle_response(resp, {200: instance})
     assert isinstance(dto, instance)
     return dto
+
+
+def post_request(path: str, req_object: dataclasses) -> int:
+    data = json.dumps(dataclasses.asdict(req_object)).encode("utf-8")
+    resp: requests.Response = requests.post(path, data=data, headers=get_student_testing_header())
+    return resp.status_code

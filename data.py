@@ -45,7 +45,7 @@ class StudentCourseResp(Resp):
 
 
 @dataclass
-class Submission(Resp):
+class SubmissionResp(Resp):
     id: str = None,
     solution: str = None
     submission_time: str = None
@@ -58,5 +58,5 @@ class Submission(Resp):
 
 @dataclass
 class StudentAllSubmissionsResp(Resp):
-    submissions: List[Submission] = None,
+    submissions: List[SubmissionResp] = None,
     count: int = None
