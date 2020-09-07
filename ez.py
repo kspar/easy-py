@@ -15,6 +15,7 @@ class Ez:
     def __init__(self):
         self.is_auth = False
         self.root = conf.BASE_URL
+        self.headers: dict = util.get_student_testing_header()
 
     def get_my_courses(self) -> data.StudentCourseResp:
         """
@@ -22,7 +23,7 @@ class Ez:
         """
         logging.debug(f"Get summaries of courses the authenticated student has access to")
         path = f"{self.root}/student/courses"
-        return util.simple_get_request(path, data.StudentCourseResp)
+        return util.simple_get_request(path, data.StudentCourseResp, self.headers)
 
     def get_exercise_details(self, course_id: str, course_exercise_id: str) -> data.ExerciseDetailsResp:
         """
@@ -31,7 +32,7 @@ class Ez:
         logging.debug(f"GET exercise details for course '{course_id}' exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
-        return util.simple_get_request(path, data.ExerciseDetailsResp)
+        return util.simple_get_request(path, data.ExerciseDetailsResp, self.headers)
 
     def get_latest_exercise_submission_details(self, course_id: str, course_exercise_id: str) -> data.SubmissionResp:
         """
@@ -40,7 +41,7 @@ class Ez:
         logging.debug(f"GET latest submission's details to the '{course_id}' exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/latest/await"
-        return util.simple_get_request(path, data.SubmissionResp)
+        return util.simple_get_request(path, data.SubmissionResp, self.headers)
 
     def get_all_student_submissions(self, course_id: str, course_exercise_id: str) -> data.StudentAllSubmissionsResp:
         """
@@ -49,7 +50,7 @@ class Ez:
         logging.debug(f" Get submissions to course '{course_id}' course exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/all"
-        return util.simple_get_request(path, data.StudentAllSubmissionsResp)
+        return util.simple_get_request(path, data.StudentAllSubmissionsResp, self.headers)
 
     def post_student_submissions(self, course_id: str, course_exercise_id: str, solution: str) -> int:
         """
@@ -63,7 +64,7 @@ class Ez:
             solution: str
 
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions"
-        return util.post_request(path, Submission(solution))
+        return util.post_request(path, Submission(solution), self.headers)
 
 
 # TODO: rm after implementation
@@ -71,6 +72,6 @@ if __name__ == '__main__':
     ez = Ez()
     print(ez.get_my_courses())
     print(ez.get_exercise_details("1", "1"))
-    print(ez.get_latest_exercise_submission_details("1", "1").autograde_status)
+    print(ez.get_latest_exercise_submission_details("1", "1"))
     print(ez.get_all_student_submissions("1", "1"))
     print(ez.post_student_submissions("1", "1", "solution1"))

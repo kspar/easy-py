@@ -46,14 +46,14 @@ def handle_response(resp: requests.Response, code_to_instance: Dict[int, Type[Ca
         raise ResponseMissingKeyException(resp, e)
 
 
-def simple_get_request(path: str, instance: Callable):
-    resp: requests.Response = requests.get(path, headers=get_student_testing_header())
+def simple_get_request(path: str, instance: Callable, headers: dict):
+    resp: requests.Response = requests.get(path, headers=headers)
     dto = handle_response(resp, {200: instance})
     assert isinstance(dto, instance)
     return dto
 
 
-def post_request(path: str, req_object: dataclasses) -> int:
+def post_request(path: str, req_object: dataclasses, headers: dict) -> int:
     data = json.dumps(dataclasses.asdict(req_object)).encode("utf-8")
-    resp: requests.Response = requests.post(path, data=data, headers=get_student_testing_header())
+    resp: requests.Response = requests.post(path, data=data, headers=headers)
     return resp.status_code
