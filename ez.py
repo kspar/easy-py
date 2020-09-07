@@ -11,11 +11,10 @@ logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(format='%(asctime)s - %(message)s-%(levelname)s', level=logging.DEBUG)
 
 
-class Ez:
-    def __init__(self):
-        self.is_auth = False
-        self.root = conf.BASE_URL
-        self.headers: dict = util.get_student_testing_header()
+class Student:
+    def __init__(self, root: str, headers: dict):
+        self.root: str = root
+        self.headers: dict = headers
 
     def get_my_courses(self) -> data.StudentCourseResp:
         """
@@ -67,11 +66,19 @@ class Ez:
         return util.post_request(path, Submission(solution), self.headers)
 
 
+class Ez:
+    def __init__(self):
+        self.is_auth = False
+        self.root = conf.BASE_URL
+        self.headers: dict = util.get_student_testing_header()
+        self.student: Student = Student(self.root, self.headers)
+
+
 # TODO: rm after implementation
 if __name__ == '__main__':
     ez = Ez()
-    print(ez.get_my_courses())
-    print(ez.get_exercise_details("1", "1"))
-    print(ez.get_latest_exercise_submission_details("1", "1"))
-    print(ez.get_all_student_submissions("1", "1"))
-    print(ez.post_student_submissions("1", "1", "solution1"))
+    print(ez.student.get_my_courses())
+    print(ez.student.get_exercise_details("1", "1"))
+    print(ez.student.get_latest_exercise_submission_details("1", "1"))
+    print(ez.student.get_all_student_submissions("1", "1"))
+    print(ez.student.post_student_submission("1", "1", "solution1"))
