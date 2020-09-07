@@ -66,12 +66,26 @@ class Student:
         return util.post_request(path, Submission(solution), self.headers)
 
 
+class Teacher:
+    def __init__(self, root: str, headers: dict):
+        self.root: str = root
+        self.headers: dict = headers
+
+    def get_courses(self) -> data.TeacherCourseResp:
+        """
+        GET summaries of courses the authenticated teacher has access to.
+        """
+        logging.debug(f"GET summaries of courses the authenticated teacher has access to")
+        path = f"{self.root}/teacher/courses"
+        return util.simple_get_request(path, data.TeacherCourseResp, self.headers)
+
+
 class Ez:
     def __init__(self):
         self.is_auth = False
         self.root = conf.BASE_URL
-        self.headers: dict = util.get_student_testing_header()
-        self.student: Student = Student(self.root, self.headers)
+        self.student: Student = Student(self.root, util.get_student_testing_header())
+        self.teacher: Teacher = Teacher(self.root, util.get_teacher_testing_header())
 
 
 # TODO: rm after implementation
@@ -82,3 +96,4 @@ if __name__ == '__main__':
     print(ez.student.get_latest_exercise_submission_details("1", "1"))
     print(ez.student.get_all_submissions("1", "1"))
     print(ez.student.post_submission("1", "1", "solution1"))
+    print(ez.teacher.get_courses())

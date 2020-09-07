@@ -60,3 +60,15 @@ class SubmissionResp(Resp):
 class StudentAllSubmissionsResp(Resp):
     submissions: List[SubmissionResp] = None,
     count: int = None
+
+
+@dataclass
+class TeacherCourse:
+    id: str = None,
+    title: str = None,
+    student_count: int = None
+
+
+@dataclass
+class TeacherCourseResp(Resp):
+    courses: List[TeacherCourse] = None

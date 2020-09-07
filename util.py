@@ -26,6 +26,15 @@ def get_student_testing_header():
             "oidc_claim_preferred_username": "fp"}
 
 
+def get_teacher_testing_header():
+    return {"Content-Type": "application/json",
+            "oidc_claim_easy_role": "teacher",
+            "oidc_claim_email": "foo@bar.com",
+            "oidc_claim_given_name": "Foo",
+            "oidc_claim_family_name": "Bar",
+            "oidc_claim_preferred_username": "fp"}
+
+
 def handle_response(resp: requests.Response, code_to_instance: Dict[int, Type[Callable]]) -> Resp:
     try:
         j: dict = resp.json()
