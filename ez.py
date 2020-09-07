@@ -52,7 +52,7 @@ class Ez:
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/all"
         return util.simple_get_request(path, data.StudentAllSubmissionsResp, self.headers)
 
-    def post_student_submissions(self, course_id: str, course_exercise_id: str, solution: str) -> int:
+    def post_student_submission(self, course_id: str, course_exercise_id: str, solution: str) -> int:
         """
         POST submission to this course exercise.
         """
