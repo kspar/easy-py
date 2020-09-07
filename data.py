@@ -5,6 +5,18 @@ from typing import List
 import requests
 
 
+class AutogradeStatus(Enum):
+    NONE = "NONE"
+    IN_PROGRESS = "IN_PRGRESS"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class GraderType(Enum):
+    AUTO = "AUTO"
+    TEACHER = "TEACHER"
+
+
 @dataclass
 class Resp:
     resp_code: int = None,
@@ -16,7 +28,7 @@ class ExerciseDetailsResp(Resp):
     effective_title: str = None,
     text_html: str = None,
     deadline: str = None,
-    grader_type: str = None,
+    grader_type: GraderType = None,
     threshold: int = None,
     instructions_html: str = None
 
@@ -30,13 +42,6 @@ class StudentCourse:
 @dataclass
 class StudentCourseResp(Resp):
     courses: List[StudentCourse] = None
-
-
-class AutogradeStatus(Enum):
-    NONE = "NONE"
-    IN_PROGRESS = "IN_PRGRESS"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
 
 
 @dataclass
