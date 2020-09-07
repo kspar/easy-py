@@ -16,7 +16,7 @@ class Student:
         self.root: str = root
         self.headers: dict = headers
 
-    def get_my_courses(self) -> data.StudentCourseResp:
+    def get_courses(self) -> data.StudentCourseResp:
         """
         GET summaries of courses the authenticated student has access to.
         """
@@ -42,7 +42,7 @@ class Student:
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/latest/await"
         return util.simple_get_request(path, data.SubmissionResp, self.headers)
 
-    def get_all_student_submissions(self, course_id: str, course_exercise_id: str) -> data.StudentAllSubmissionsResp:
+    def get_all_submissions(self, course_id: str, course_exercise_id: str) -> data.StudentAllSubmissionsResp:
         """
         GET submissions to this course exercise.
         """
@@ -51,7 +51,7 @@ class Student:
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/all"
         return util.simple_get_request(path, data.StudentAllSubmissionsResp, self.headers)
 
-    def post_student_submission(self, course_id: str, course_exercise_id: str, solution: str) -> int:
+    def post_submission(self, course_id: str, course_exercise_id: str, solution: str) -> int:
         """
         POST submission to this course exercise.
         """
@@ -77,8 +77,8 @@ class Ez:
 # TODO: rm after implementation
 if __name__ == '__main__':
     ez = Ez()
-    print(ez.student.get_my_courses())
+    print(ez.student.get_courses())
     print(ez.student.get_exercise_details("1", "1"))
     print(ez.student.get_latest_exercise_submission_details("1", "1"))
-    print(ez.student.get_all_student_submissions("1", "1"))
-    print(ez.student.post_student_submission("1", "1", "solution1"))
+    print(ez.student.get_all_submissions("1", "1"))
+    print(ez.student.post_submission("1", "1", "solution1"))
