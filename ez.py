@@ -1,6 +1,8 @@
 import logging
 from dataclasses import dataclass
 
+from keycloak import KeycloakOpenID
+
 import conf
 import data
 import util
@@ -81,19 +83,38 @@ class Teacher:
 
 
 class Ez:
-    def __init__(self):
+    def __init__(self, headers: dict):
         self.is_auth = False
         self.root = conf.BASE_URL
-        self.student: Student = Student(self.root, util.get_student_testing_header())
-        self.teacher: Teacher = Teacher(self.root, util.get_teacher_testing_header())
+        self.student: Student = Student(self.root, headers)
+        self.teacher: Teacher = Teacher(self.root, headers)
 
 
 # TODO: rm after implementation
 if __name__ == '__main__':
-    ez = Ez()
+    # print(ez.student.get_courses())
+    # print(ez.student.get_exercise_details("1", "1"))
+    # print(ez.student.get_latest_exercise_submission_details("1", "1"))
+    # print(ez.student.get_all_submissions("1", "1"))
+    # print(ez.student.post_submission("1", "1", "solution1"))
+    # print(ez.teacher.get_courses())
+
+    # TODO: https://python-keycloak.readthedocs.io/en/latest/
+    # Configure client
+    keycloak_openid = KeycloakOpenID(server_url="https://dev.idp.lahendus.ut.ee/auth/",
+                                     client_id="dev.lahendus.ut.ee",
+                                     realm_name="master",
+                                     verify=True)
+
+    # Get WellKnow
+    config_well_know = keycloak_openid.well_know()
+
+    # Get Token
+    token = keycloak_openid.token(conf.USER, conf.PASSWORD)
+    userinfo = keycloak_openid.userinfo(token['access_token'])
+
+    header = {"Authorization": f"Bearer {token.get('access_token')}",
+              "Content-Type": "application/json", }
+
+    ez = Ez(header)
     print(ez.student.get_courses())
-    print(ez.student.get_exercise_details("1", "1"))
-    print(ez.student.get_latest_exercise_submission_details("1", "1"))
-    print(ez.student.get_all_submissions("1", "1"))
-    print(ez.student.post_submission("1", "1", "solution1"))
-    print(ez.teacher.get_courses())
