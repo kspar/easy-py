@@ -1,12 +1,13 @@
-from flask import Flask, request, Response, render_template
+import json
+import logging
 import os
 import socket
 import threading
-import webbrowser
-import subprocess
-import requests
-import json
 import time
+import webbrowser
+
+import requests
+from flask import Flask, request, Response, render_template
 
 import conf
 import util
@@ -14,7 +15,6 @@ import util
 app = Flask(__name__)
 
 port = None
-browser_process = None
 
 
 @app.route('/keycloak.json')
@@ -32,12 +32,6 @@ def controller_deliver_tokens():
     if request.is_json:
         body = request.get_json()
         _write_tokens(body['access_token'], int(body['access_token_valid_sec']), body['refresh_token'])
-
-        if browser_process is not None:
-            print("Terminating")
-            browser_process.terminate()
-        else:
-            print("Browser process is None ???")
 
         _shutdown_server()
 
@@ -75,19 +69,12 @@ def _get_free_port():
             # Port already in use?
             pass
 
-    raise OSError("Unable to bind to ports {} - {}".format(conf.AUTH_PORT_RANGE_FIRST, conf.AUTH_PORT_RANGE_LAST))
-
-
-def _open_browser(url):
-    global browser_process
-    browser_name = webbrowser.get().name
-    browser_process = subprocess.Popen([browser_name, url],
-                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    raise OSError(f"Unable to bind to ports {conf.AUTH_PORT_RANGE_FIRST} - {conf.AUTH_PORT_RANGE_LAST}")
 
 
 def _refresh_using_refresh_token() -> bool:
     if not os.path.isfile('refresh_token'):
-        util.debug("No refresh token found")
+        logging.debug("No refresh token found")
         return False
 
     with open('refresh_token') as f:
@@ -99,15 +86,15 @@ def _refresh_using_refresh_token() -> bool:
         'client_id': conf.IDP_CLIENT_NAME
     }
 
-    r = requests.post(conf.IDP_URL + "/auth/realms/master/protocol/openid-connect/token", data=token_req_body)
+    r = requests.post(f"{conf.IDP_URL}/auth/realms/master/protocol/openid-connect/token", data=token_req_body)
 
     if r.status_code == 200:
         resp_body = r.json()
         _write_tokens(resp_body['access_token'], resp_body['expires_in'], resp_body['refresh_token'])
-        util.debug("Refreshed tokens using refresh token")
+        logging.debug("Refreshed tokens using refresh token")
         return True
     else:
-        util.warn("Refreshing tokens failed with status {}".format(r.status_code))
+        logging.warning(f"Refreshing tokens failed with status {r.status_code}")
         return False
 
 
@@ -118,10 +105,10 @@ def auth():
         return
 
     port = _get_free_port()
-    url = 'http://127.0.0.1:{}/login'.format(port)
+    url = f'http://127.0.0.1:{port}/login'
 
     # Assume the server starts in 1 second
-    threading.Timer(1, lambda: _open_browser(url)).start()
+    threading.Timer(1, lambda: webbrowser.open(url)).start()
 
     app.run(host='127.0.0.1', port=port)
 
