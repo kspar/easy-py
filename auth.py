@@ -1,16 +1,14 @@
-import json
 import logging
-import os
 import socket
 import threading
-import time
 import webbrowser
+from typing import Callable, Tuple
 
 import requests
 from flask import Flask, request, Response, render_template
 
 import conf
-import util
+import data
 
 
 def _get_free_port() -> int:
@@ -27,26 +25,16 @@ def _get_free_port() -> int:
     raise OSError(f"Unable to bind to ports {conf.AUTH_PORT_RANGE_FIRST} - {conf.AUTH_PORT_RANGE_LAST}")
 
 
-def _write_tokens(access_token, valid_sec, refresh_token):
-    access_token_file = json.dumps({
-        'access_token': access_token,
-        'expires_at': round(time.time()) + valid_sec
-    })
+def _refresh_using_refresh_token(read_token: Callable[[data.Token], Tuple[str, int]],
+                                 save_tokens: Callable[[str, int, str], None]) -> bool:
+    refresh_token, _ = read_token(data.Token.REFRESH)
 
-    util.write_restricted_file('access_token', access_token_file)
-    util.write_restricted_file('refresh_token', refresh_token)
-
-
-def _refresh_using_refresh_token() -> bool:
-    if not os.path.isfile('refresh_token'):
+    if refresh_token is None:
         logging.debug("No refresh token found")
         return False
 
-    with open('refresh_token') as f:
-        refresh_token = f.read()
-
     token_req_body = {
-        'grant_type': 'refresh_token',
+        'grant_type': data.Token.REFRESH.value,
         'refresh_token': refresh_token,
         'client_id': conf.IDP_CLIENT_NAME
     }
@@ -55,7 +43,10 @@ def _refresh_using_refresh_token() -> bool:
 
     if r.status_code == 200:
         resp_body = r.json()
-        _write_tokens(resp_body['access_token'], resp_body['expires_in'], resp_body['refresh_token'])
+        save_tokens(resp_body[data.Token.ACCESS.value],
+                    resp_body['expires_in'],
+                    resp_body[data.Token.REFRESH.value])
+
         logging.debug("Refreshed tokens using refresh token")
         return True
     else:
@@ -63,7 +54,8 @@ def _refresh_using_refresh_token() -> bool:
         return False
 
 
-def auth():
+def auth(read_token: Callable[[data.Token], Tuple[str, int]],
+         save_tokens: Callable[[str, int, str], None]):
     app = Flask(__name__)
 
     def shutdown_server():
@@ -85,7 +77,9 @@ def auth():
         try:
             if request.is_json:
                 body = request.get_json()
-                _write_tokens(body['access_token'], int(body['access_token_valid_sec']), body['refresh_token'])
+                save_tokens(body[data.Token.ACCESS.value],
+                            int(body['access_token_valid_sec']),
+                            body[data.Token.REFRESH.value])
 
                 return Response(status=200)
             else:
@@ -93,7 +87,7 @@ def auth():
         finally:
             shutdown_server()
 
-    if _refresh_using_refresh_token():
+    if _refresh_using_refresh_token(read_token, save_tokens):
         return
 
     local, port = "127.0.0.1", _get_free_port()

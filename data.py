@@ -17,6 +17,11 @@ class GraderType(Enum):
     TEACHER = "TEACHER"
 
 
+class Token(Enum):
+    ACCESS = "access_token"
+    REFRESH = "refresh_token"
+
+
 @dataclass
 class Resp:
     resp_code: int = None,

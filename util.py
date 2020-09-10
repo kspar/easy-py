@@ -1,45 +1,29 @@
 import dataclasses
 import json
-import os
 import time
-from typing import Callable, Dict, Type
+from typing import Callable, Dict, Type, Tuple
 
 import requests
 
 import auth
 import conf
+import data
 from data import Resp
 from exceptions import ErrorResponseException, ResponseMissingKeyException, ErrorResp, UnexpectedResponseException
 
 
-def get_token_header() -> Dict[str, str]:
-    access_token_file, expires_at = None, 0
-
-    if os.path.isfile("access_token"):
-        access_token_file = json.loads(get_file_content("access_token").strip())
-        expires_at = access_token_file["expires_at"]
+def get_token_header(read_token: Callable[[data.Token], Tuple[str, int]],
+                     save_tokens: Callable[[str, int, str], None]) -> Dict[str, str]:
+    access_token_file, expires_at = read_token(data.Token.ACCESS)
 
     if access_token_file is None or time.time() > expires_at + conf.AUTH_TOKEN_MIN_VALID_SEC:
-        auth.auth()
-
-        if os.path.isfile("access_token"):
-            access_token_file = json.loads(get_file_content("access_token").strip())
-            expires_at = access_token_file["expires_at"]
+        auth.auth(read_token, save_tokens)
+        access_token_file, expires_at = read_token(data.Token.ACCESS)
 
         if access_token_file is None or time.time() > expires_at + conf.AUTH_TOKEN_MIN_VALID_SEC:
             raise RuntimeError("Could not get/refresh tokens")
 
-    return {"Authorization": f"Bearer {access_token_file['access_token']}"}
-
-
-def get_file_content(file_name) -> str:
-    with open(file_name, encoding="utf-8") as f:
-        return f.read()
-
-
-def write_restricted_file(file_name, file_content):
-    with open(os.open(file_name, os.O_CREAT | os.O_WRONLY, 0o600), "w") as f:
-        f.write(file_content)
+    return {"Authorization": f"Bearer {access_token_file[data.Token.ACCESS.value]}"}
 
 
 def contains_none(args) -> bool:
@@ -71,32 +55,16 @@ def handle_response(resp: requests.Response, code_to_instance: Dict[int, Type[Ca
         raise ResponseMissingKeyException(resp, e)
 
 
-def simple_get_request(path: str, instance: Callable, header_func: Callable):
-    resp: requests.Response = requests.get(path, headers=header_func())
+def simple_get_request(path: str, instance: Callable, read_token: Callable[[data.Token], Tuple[str, int]],
+                       save_tokens: Callable[[str, int, str], None]):
+    resp: requests.Response = requests.get(path, headers=get_token_header(read_token, save_tokens))
     dto = handle_response(resp, {200: instance})
     assert isinstance(dto, instance)
     return dto
 
 
-def post_request(path: str, req_object: dataclasses, header_func: Callable) -> int:
+def post_request(path: str, req_object: dataclasses, read_token: Callable[[data.Token], Tuple[str, int]],
+                 save_tokens: Callable[[str, int, str], None]) -> int:
     data = json.dumps(dataclasses.asdict(req_object)).encode("utf-8")
-    resp: requests.Response = requests.post(path, data=data, headers=header_func())
+    resp: requests.Response = requests.post(path, data=data, headers=get_token_header(read_token, save_tokens))
     return resp.status_code
-
-
-def get_student_testing_header() -> Dict[str, str]:
-    return {"Content-Type": "application/json",
-            "oidc_claim_easy_role": "student",
-            "oidc_claim_email": "foo@bar.com",
-            "oidc_claim_given_name": "Foo",
-            "oidc_claim_family_name": "Bar",
-            "oidc_claim_preferred_username": "fp"}
-
-
-def get_teacher_testing_header() -> Dict[str, str]:
-    return {"Content-Type": "application/json",
-            "oidc_claim_easy_role": "teacher",
-            "oidc_claim_email": "foo@bar.com",
-            "oidc_claim_given_name": "Foo",
-            "oidc_claim_family_name": "Bar",
-            "oidc_claim_preferred_username": "fp"}
