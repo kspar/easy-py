@@ -27,36 +27,6 @@ def _get_free_port():
     raise OSError(f"Unable to bind to ports {conf.AUTH_PORT_RANGE_FIRST} - {conf.AUTH_PORT_RANGE_LAST}")
 
 
-app = Flask(__name__)
-port = _get_free_port()
-url = f'http://127.0.0.1:{port}/login'
-thread = threading.Thread(target=app.run, args=("127.0.0.1", port, False, False,))
-
-
-@app.route('/keycloak.json')
-def controller_keycloak_conf():
-    return render_template("keycloak.json", idp_url=conf.IDP_URL, client_name=conf.IDP_CLIENT_NAME)
-
-
-@app.route('/login')
-def controller_login():
-    return render_template("login.html", idp_url=conf.IDP_URL, port=port)
-
-
-@app.route('/deliver-tokens', methods=['POST'])
-def controller_deliver_tokens():
-    try:
-        if request.is_json:
-            body = request.get_json()
-            _write_tokens(body['access_token'], int(body['access_token_valid_sec']), body['refresh_token'])
-
-            return Response(status=200)
-        else:
-            return Response(status=400)
-    finally:
-        _shutdown_server()
-
-
 def _write_tokens(access_token, valid_sec, refresh_token):
     access_token_file = json.dumps({
         'access_token': access_token,
@@ -101,6 +71,32 @@ def _refresh_using_refresh_token() -> bool:
 
 
 def auth():
+    app = Flask(__name__)
+    port = _get_free_port()
+    url = f'http://127.0.0.1:{port}/login'
+    thread = threading.Thread(target=app.run, args=("127.0.0.1", port, False, False,))
+
+    @app.route('/keycloak.json')
+    def controller_keycloak_conf():
+        return render_template("keycloak.json", idp_url=conf.IDP_URL, client_name=conf.IDP_CLIENT_NAME)
+
+    @app.route('/login')
+    def controller_login():
+        return render_template("login.html", idp_url=conf.IDP_URL, port=port)
+
+    @app.route('/deliver-tokens', methods=['POST'])
+    def controller_deliver_tokens():
+        try:
+            if request.is_json:
+                body = request.get_json()
+                _write_tokens(body['access_token'], int(body['access_token_valid_sec']), body['refresh_token'])
+
+                return Response(status=200)
+            else:
+                return Response(status=400)
+        finally:
+            _shutdown_server()
+
     if _refresh_using_refresh_token():
         return
 
@@ -109,7 +105,3 @@ def auth():
 
     thread.start()
     thread.join()
-
-
-if __name__ == '__main__':
-    auth()
