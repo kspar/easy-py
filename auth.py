@@ -12,9 +12,25 @@ from flask import Flask, request, Response, render_template
 import conf
 import util
 
-app = Flask(__name__)
 
-port = None
+def _get_free_port():
+    for p in range(conf.AUTH_PORT_RANGE_FIRST, conf.AUTH_PORT_RANGE_LAST + 1):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.bind(('127.0.0.1', p))
+            sock.close()
+            return p
+        except OSError:
+            # Port already in use?
+            pass
+
+    raise OSError(f"Unable to bind to ports {conf.AUTH_PORT_RANGE_FIRST} - {conf.AUTH_PORT_RANGE_LAST}")
+
+
+app = Flask(__name__)
+port = _get_free_port()
+url = f'http://127.0.0.1:{port}/login'
+thread = threading.Thread(target=app.run, args=("127.0.0.1", port, False, False,))
 
 
 @app.route('/keycloak.json')
@@ -29,16 +45,16 @@ def controller_login():
 
 @app.route('/deliver-tokens', methods=['POST'])
 def controller_deliver_tokens():
-    if request.is_json:
-        body = request.get_json()
-        _write_tokens(body['access_token'], int(body['access_token_valid_sec']), body['refresh_token'])
+    try:
+        if request.is_json:
+            body = request.get_json()
+            _write_tokens(body['access_token'], int(body['access_token_valid_sec']), body['refresh_token'])
 
+            return Response(status=200)
+        else:
+            return Response(status=400)
+    finally:
         _shutdown_server()
-
-        return Response(status=200)
-
-    else:
-        return Response(status=400)
 
 
 def _write_tokens(access_token, valid_sec, refresh_token):
@@ -56,20 +72,6 @@ def _shutdown_server():
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
     func()
-
-
-def _get_free_port():
-    for p in range(conf.AUTH_PORT_RANGE_FIRST, conf.AUTH_PORT_RANGE_LAST + 1):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            sock.bind(('127.0.0.1', p))
-            sock.close()
-            return p
-        except OSError:
-            # Port already in use?
-            pass
-
-    raise OSError(f"Unable to bind to ports {conf.AUTH_PORT_RANGE_FIRST} - {conf.AUTH_PORT_RANGE_LAST}")
 
 
 def _refresh_using_refresh_token() -> bool:
@@ -99,18 +101,14 @@ def _refresh_using_refresh_token() -> bool:
 
 
 def auth():
-    global port
-
     if _refresh_using_refresh_token():
         return
-
-    port = _get_free_port()
-    url = f'http://127.0.0.1:{port}/login'
 
     # Assume the server starts in 1 second
     threading.Timer(1, lambda: webbrowser.open(url)).start()
 
-    app.run(host='127.0.0.1', port=port)
+    thread.start()
+    thread.join()
 
 
 if __name__ == '__main__':
