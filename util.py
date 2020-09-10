@@ -37,12 +37,6 @@ def get_file_content(file_name):
         return f.read()
 
 
-def get_optional_file_content(file_name):
-    if file_name is None:
-        return None
-    return get_file_content(file_name)
-
-
 def write_restricted_file(file_name, file_content):
     with open(os.open(file_name, os.O_CREAT | os.O_WRONLY, 0o600), "w") as f:
         f.write(file_content)
