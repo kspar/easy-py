@@ -72,9 +72,6 @@ def _refresh_using_refresh_token() -> bool:
 
 def auth():
     app = Flask(__name__)
-    port = _get_free_port()
-    url = f'http://127.0.0.1:{port}/login'
-    thread = threading.Thread(target=app.run, args=("127.0.0.1", port, False, False,))
 
     @app.route('/keycloak.json')
     def controller_keycloak_conf():
@@ -99,6 +96,10 @@ def auth():
 
     if _refresh_using_refresh_token():
         return
+
+    local, port = "127.0.0.1", _get_free_port()
+    url = f'http://{local}:{port}/login'
+    thread = threading.Thread(target=app.run, args=(local, port, False, False,))
 
     # Assume the server starts in 1 second
     threading.Timer(1, lambda: webbrowser.open(url)).start()
