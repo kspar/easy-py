@@ -12,7 +12,7 @@ from data import Resp
 from exceptions import ErrorResponseException, ResponseMissingKeyException, ErrorResp, UnexpectedResponseException
 
 
-def get_token_header():
+def get_token_header() -> Dict[str, str]:
     access_token_file, expires_at = None, 0
 
     if os.path.isfile("access_token"):
@@ -32,7 +32,7 @@ def get_token_header():
     return {"Authorization": f"Bearer {access_token_file['access_token']}"}
 
 
-def get_file_content(file_name):
+def get_file_content(file_name) -> str:
     with open(file_name, encoding="utf-8") as f:
         return f.read()
 
@@ -42,7 +42,7 @@ def write_restricted_file(file_name, file_content):
         f.write(file_content)
 
 
-def contains_none(args):
+def contains_none(args) -> bool:
     return None in args
 
 
@@ -84,7 +84,7 @@ def post_request(path: str, req_object: dataclasses, header_func: Callable) -> i
     return resp.status_code
 
 
-def get_student_testing_header():
+def get_student_testing_header() -> Dict[str, str]:
     return {"Content-Type": "application/json",
             "oidc_claim_easy_role": "student",
             "oidc_claim_email": "foo@bar.com",
@@ -93,7 +93,7 @@ def get_student_testing_header():
             "oidc_claim_preferred_username": "fp"}
 
 
-def get_teacher_testing_header():
+def get_teacher_testing_header() -> Dict[str, str]:
     return {"Content-Type": "application/json",
             "oidc_claim_easy_role": "teacher",
             "oidc_claim_email": "foo@bar.com",
