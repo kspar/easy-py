@@ -22,12 +22,12 @@ def read_token(token_type: data.Token) -> Tuple[str, int]:
 
 def write_tokens(access_token: str, valid_sec: int, refresh_token: str):
     access_token_file = json.dumps({
-        'access_token': access_token,
+        data.Token.ACCESS.value: access_token,
         'expires_at': round(time.time()) + valid_sec
     })
 
-    write_restricted_file('access_token', access_token_file)
-    write_restricted_file('refresh_token', refresh_token)
+    write_restricted_file(data.Token.ACCESS.value, access_token_file)
+    write_restricted_file(data.Token.REFRESH.value, refresh_token)
 
 
 def get_file_content(file_name) -> str:
