@@ -13,7 +13,7 @@ import conf
 import util
 
 
-def _get_free_port():
+def _get_free_port() -> int:
     for p in range(conf.AUTH_PORT_RANGE_FIRST, conf.AUTH_PORT_RANGE_LAST + 1):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
