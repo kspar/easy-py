@@ -37,13 +37,6 @@ def _write_tokens(access_token, valid_sec, refresh_token):
     util.write_restricted_file('refresh_token', refresh_token)
 
 
-def _shutdown_server():
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func is None:
-        raise RuntimeError('Not running with the Werkzeug Server')
-    func()
-
-
 def _refresh_using_refresh_token() -> bool:
     if not os.path.isfile('refresh_token'):
         logging.debug("No refresh token found")
@@ -73,6 +66,12 @@ def _refresh_using_refresh_token() -> bool:
 def auth():
     app = Flask(__name__)
 
+    def shutdown_server():
+        func = request.environ.get('werkzeug.server.shutdown')
+        if func is None:
+            raise RuntimeError('Not running with the Werkzeug Server')
+        func()
+
     @app.route('/keycloak.json')
     def controller_keycloak_conf():
         return render_template("keycloak.json", idp_url=conf.IDP_URL, client_name=conf.IDP_CLIENT_NAME)
@@ -92,7 +91,7 @@ def auth():
             else:
                 return Response(status=400)
         finally:
-            _shutdown_server()
+            shutdown_server()
 
     if _refresh_using_refresh_token():
         return
