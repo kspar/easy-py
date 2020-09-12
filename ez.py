@@ -1,7 +1,14 @@
+import dataclasses
+import json
 import logging
+import time
+import typing as T
 from dataclasses import dataclass
-from typing import Callable, Tuple
+from typing import Callable, Dict, Tuple
 
+import requests
+
+import auth
 import conf
 import data
 import util
@@ -11,13 +18,48 @@ logging.basicConfig(level=logging.DEBUG)
 logging.basicConfig(format='%(asctime)s - %(message)s-%(levelname)s', level=logging.DEBUG)
 
 
+# TODO:
+# Callable -> Type for classes?
+# typing -> T
+# conf
+# logging from conf
+
+class RequestUtil:
+    def __init__(self,
+                 retrieve_tokens: Callable[[data.Token], Tuple[str, int]],
+                 persist_tokens: Callable[[str, int, str], None]):
+        self.retrieve_tokens = retrieve_tokens
+        self.persist_tokens = persist_tokens
+
+    def simple_get_request(self, path: str, response_dto: Callable) -> T.Any:
+        resp: requests.Response = requests.get(path, headers=self.get_token_header())
+        dto = util.handle_response(resp, {200: response_dto})
+        assert isinstance(dto, response_dto)
+        return dto
+
+    def post_request(self, path: str, req_object: T.Any) -> int:
+        data = json.dumps(dataclasses.asdict(req_object)).encode("utf-8")
+        resp: requests.Response = requests.post(path, data=data, headers=self.get_token_header())
+        return resp.status_code
+
+    def get_token_header(self) -> Dict[str, str]:
+        access_token_file, expires_at = self.retrieve_tokens(data.Token.ACCESS)
+
+        if access_token_file is None or time.time() > expires_at + conf.AUTH_TOKEN_MIN_VALID_SEC:
+            auth.auth(self.retrieve_tokens, self.persist_tokens)
+            access_token_file, expires_at = self.retrieve_tokens(data.Token.ACCESS)
+
+            if access_token_file is None or time.time() > expires_at + conf.AUTH_TOKEN_MIN_VALID_SEC:
+                raise RuntimeError("Could not get/refresh tokens")
+
+        return {"Authorization": f"Bearer {access_token_file[data.Token.ACCESS.value]}"}
+
+
 class Student:
     def __init__(self, root: str,
-                 read_token: Callable[[data.Token], Tuple[str, int]],
-                 save_tokens: Callable[[str, int, str], None]):
+                 request_util: RequestUtil):
         self.root: str = root
-        self.read_token: Callable[[data.Token], Tuple[str, int]] = read_token
-        self.write_token: Callable[[str, int, str], None] = save_tokens
+        self.request_util = request_util
 
     def get_courses(self) -> data.StudentCourseResp:
         """
@@ -25,7 +67,7 @@ class Student:
         """
         logging.debug(f"GET summaries of courses the authenticated student has access to")
         path = f"{self.root}/student/courses"
-        return util.simple_get_request(path, data.StudentCourseResp, self.read_token, self.write_token)
+        return self.request_util.simple_get_request(path, data.StudentCourseResp)
 
     def get_exercise_details(self, course_id: str, course_exercise_id: str) -> data.ExerciseDetailsResp:
         """
@@ -34,7 +76,7 @@ class Student:
         logging.debug(f"GET exercise details for course '{course_id}' exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}"
-        return util.simple_get_request(path, data.ExerciseDetailsResp, self.read_token, self.write_token)
+        return self.request_util.simple_get_request(path, data.ExerciseDetailsResp)
 
     def get_latest_exercise_submission_details(self, course_id: str, course_exercise_id: str) -> data.SubmissionResp:
         """
@@ -43,7 +85,7 @@ class Student:
         logging.debug(f"GET latest submission's details to the '{course_id}' exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/latest/await"
-        return util.simple_get_request(path, data.SubmissionResp, self.read_token, self.write_token)
+        return self.request_util.simple_get_request(path, data.SubmissionResp)
 
     def get_all_submissions(self, course_id: str, course_exercise_id: str) -> data.StudentAllSubmissionsResp:
         """
@@ -52,7 +94,7 @@ class Student:
         logging.debug(f" GET submissions to course '{course_id}' course exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/all"
-        return util.simple_get_request(path, data.StudentAllSubmissionsResp, self.read_token, self.write_token)
+        return self.request_util.simple_get_request(path, data.StudentAllSubmissionsResp)
 
     def post_submission(self, course_id: str, course_exercise_id: str, solution: str) -> int:
         """
@@ -66,16 +108,14 @@ class Student:
             solution: str
 
         path = f"{self.root}/student/courses/{course_id}/exercises/{course_exercise_id}/submissions"
-        return util.post_request(path, Submission(solution), self.read_token, self.write_token)
+        return self.request_util.post_request(path, Submission(solution))
 
 
 class Teacher:
     def __init__(self, root: str,
-                 read_token: Callable[[data.Token], Tuple[str, int]],
-                 save_tokens: Callable[[str, int, str], None]):
+                 request_util: RequestUtil):
         self.root: str = root
-        self.read_token: Callable[[data.Token], Tuple[str, int]] = read_token
-        self.write_token: Callable[[str, int, str], None] = save_tokens
+        self.request_util = request_util
 
     def get_courses(self) -> data.TeacherCourseResp:
         """
@@ -83,15 +123,16 @@ class Teacher:
         """
         logging.debug(f"GET summaries of courses the authenticated teacher has access to")
         path = f"{self.root}/teacher/courses"
-        return util.simple_get_request(path, data.TeacherCourseResp, self.read_token, self.write_token)
+        return self.request_util.simple_get_request(path, data.TeacherCourseResp)
 
 
 class Ez:
     def __init__(self,
-                 read_token: Callable[[data.Token], Tuple[str, int]],
-                 save_tokens: Callable[[str, int, str], None]):
-        self.student: Student = Student(conf.BASE_URL, read_token, save_tokens)
-        self.teacher: Teacher = Teacher(conf.BASE_URL, read_token, save_tokens)
+                 retrieve_tokens: Callable[[data.Token], Tuple[str, int]],
+                 persist_tokens: Callable[[str, int, str], None]):
+        self.util = RequestUtil(retrieve_tokens, persist_tokens)
+        self.student: Student = Student(conf.BASE_URL, self.util)
+        self.teacher: Teacher = Teacher(conf.BASE_URL, self.util)
 
 
 # TODO: rm after implementation

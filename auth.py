@@ -25,16 +25,16 @@ def _get_free_port() -> int:
     raise OSError(f"Unable to bind to ports {conf.AUTH_PORT_RANGE_FIRST} - {conf.AUTH_PORT_RANGE_LAST}")
 
 
-def _refresh_using_refresh_token(read_token: Callable[[data.Token], Tuple[str, int]],
-                                 save_tokens: Callable[[str, int, str], None]) -> bool:
-    refresh_token, _ = read_token(data.Token.REFRESH)
+def _refresh_using_refresh_token(retrieve_tokens: Callable[[data.Token], Tuple[str, int]],
+                                 persist_tokens: Callable[[str, int, str], None]) -> bool:
+    refresh_token, _ = retrieve_tokens(data.Token.REFRESH)
 
     if refresh_token is None:
         logging.debug("No refresh token found")
         return False
 
     token_req_body = {
-        'grant_type': data.Token.REFRESH.value,
+        'grant_type': "refresh_token",
         'refresh_token': refresh_token,
         'client_id': conf.IDP_CLIENT_NAME
     }
@@ -43,9 +43,9 @@ def _refresh_using_refresh_token(read_token: Callable[[data.Token], Tuple[str, i
 
     if r.status_code == 200:
         resp_body = r.json()
-        save_tokens(resp_body[data.Token.ACCESS.value],
-                    resp_body['expires_in'],
-                    resp_body[data.Token.REFRESH.value])
+        persist_tokens(resp_body[data.Token.ACCESS.value],
+                       resp_body['expires_in'],
+                       resp_body[data.Token.REFRESH.value])
 
         logging.debug("Refreshed tokens using refresh token")
         return True
@@ -54,8 +54,8 @@ def _refresh_using_refresh_token(read_token: Callable[[data.Token], Tuple[str, i
         return False
 
 
-def auth(read_token: Callable[[data.Token], Tuple[str, int]],
-         save_tokens: Callable[[str, int, str], None]):
+def auth(retrieve_tokens: Callable[[data.Token], Tuple[str, int]],
+         persist_tokens: Callable[[str, int, str], None]):
     app = Flask(__name__)
 
     def shutdown_server():
@@ -77,9 +77,9 @@ def auth(read_token: Callable[[data.Token], Tuple[str, int]],
         try:
             if request.is_json:
                 body = request.get_json()
-                save_tokens(body[data.Token.ACCESS.value],
-                            int(body['access_token_valid_sec']),
-                            body[data.Token.REFRESH.value])
+                persist_tokens(body[data.Token.ACCESS.value],
+                               int(body['access_token_valid_sec']),
+                               body[data.Token.REFRESH.value])
 
                 return Response(status=200)
             else:
@@ -87,7 +87,7 @@ def auth(read_token: Callable[[data.Token], Tuple[str, int]],
         finally:
             shutdown_server()
 
-    if _refresh_using_refresh_token(read_token, save_tokens):
+    if _refresh_using_refresh_token(retrieve_tokens, persist_tokens):
         return
 
     local, port = "127.0.0.1", _get_free_port()
