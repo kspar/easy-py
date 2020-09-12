@@ -22,6 +22,8 @@ class Token(Enum):
     REFRESH = "refresh_token"
 
 
+# TODO: why do all fields have default values?
+
 @dataclass
 class Resp:
     resp_code: int = None,

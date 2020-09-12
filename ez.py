@@ -42,6 +42,7 @@ class RequestUtil:
 
     def simple_get_request(self, path: str, response_dto_class: T.Type[T.Any]) -> T.Any:
         resp: requests.Response = requests.get(self.api_url + path, headers=self.get_token_header())
+        # TODO: force reauth (auth()) if status 401
         dto = util.handle_response(resp, {200: response_dto_class})
         assert isinstance(dto, response_dto_class)
         return dto
@@ -51,6 +52,7 @@ class RequestUtil:
         req_body_dict = dataclasses.asdict(request_dto_dataclass)
         resp: requests.Response = requests.post(self.api_url + path, json=req_body_dict,
                                                 headers=self.get_token_header())
+        # TODO: force reauth (auth()) if status 401
         dto = util.handle_response(resp, resp_code_to_dto_class)
         return dto
 
@@ -112,19 +114,6 @@ class RequestUtil:
         thread.start()
         thread.join()
 
-    def _get_free_port(self) -> int:
-        for p in range(self.auth_port_range_first, self.auth_port_range_last + 1):
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                sock.bind(('127.0.0.1', p))
-                sock.close()
-                return p
-            except OSError:
-                # Port already in use?
-                pass
-
-        raise OSError(f"Unable to bind to ports {self.auth_port_range_first} - {self.auth_port_range_last}")
-
     def _refresh_using_refresh_token(self) -> bool:
         refresh_token, _ = self.retrieve_tokens(data.Token.REFRESH)
 
@@ -151,6 +140,19 @@ class RequestUtil:
         else:
             logging.warning(f"Refreshing tokens failed with status {r.status_code}")
             return False
+
+    def _get_free_port(self) -> int:
+        for p in range(self.auth_port_range_first, self.auth_port_range_last + 1):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                sock.bind(('127.0.0.1', p))
+                sock.close()
+                return p
+            except OSError:
+                # Port already in use?
+                pass
+
+        raise OSError(f"Unable to bind to ports {self.auth_port_range_first} - {self.auth_port_range_last}")
 
 
 class Student:
@@ -223,6 +225,8 @@ class Teacher:
 
 
 # TODO: token methods to optional
+# TODO: are there attributes to store with refresh token? store as dict either way, make the token funs signatures nicer
+# TODO: token enum should be in ez.py
 class Ez:
     def __init__(self,
                  api_base_url: str,
