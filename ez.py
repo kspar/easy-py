@@ -13,14 +13,9 @@ import data
 import util
 from defaults import read_token, write_tokens
 
-logging.basicConfig(level=logging.DEBUG)
-logging.basicConfig(format='%(asctime)s - %(message)s-%(levelname)s', level=logging.DEBUG)
-
 
 # TODO:
-# Callable -> Type for classes?
 # conf
-# logging from conf
 
 class RequestUtil:
     def __init__(self,
@@ -129,10 +124,18 @@ class Teacher:
 class Ez:
     def __init__(self,
                  retrieve_tokens: T.Callable[[data.Token], T.Tuple[str, int]],
-                 persist_tokens: T.Callable[[str, int, str], None]):
+                 persist_tokens: T.Callable[[str, int, str], None],
+                 logging_level: int = logging.INFO):
+        """
+
+        :param retrieve_tokens:
+        :param persist_tokens:
+        :param logging_level: default logging level, e.g. logging.DEBUG. Default: logging.INFO
+        """
         self.util = RequestUtil(retrieve_tokens, persist_tokens)
         self.student: Student = Student(conf.BASE_URL, self.util)
         self.teacher: Teacher = Teacher(conf.BASE_URL, self.util)
+        logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s : %(message)s', level=logging_level)
 
 
 # TODO: rm after implementation
