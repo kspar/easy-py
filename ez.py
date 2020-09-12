@@ -14,9 +14,10 @@ import data
 import util
 from defaults import read_token, write_tokens
 
-
 # TODO:
 # hide private fields/methods
+
+API_VERSION_PREFIX = '/v2'
 
 
 class RequestUtil:
@@ -237,11 +238,20 @@ class Ez:
         TODO
         :param logging_level: default logging level, e.g. logging.DEBUG. Default: logging.INFO
         """
-        versioned_api_url = f'{api_base_url}/v2'
+        if not api_base_url.startswith('http'):
+            api_base_url = 'https://' + api_base_url
+        api_base_url = api_base_url.rstrip('/')
+        versioned_api_url = api_base_url + API_VERSION_PREFIX
+
+        if not idp_url.startswith('http'):
+            idp_url = 'https://' + idp_url
+        idp_url = idp_url.rstrip('/')
+
         self.util = RequestUtil(versioned_api_url, idp_url, idp_client_name, auth_token_min_valid_sec,
                                 auth_port_range_first, auth_port_range_last, retrieve_tokens, persist_tokens)
         self.student: Student = Student(self.util)
         self.teacher: Teacher = Teacher(self.util)
+
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s : %(message)s', level=logging_level)
 
 
@@ -254,8 +264,8 @@ if __name__ == '__main__':
     # print(ez.student.post_submission("1", "1", "solution1"))
     # print(ez.teacher.get_courses())
 
-    ez = Ez('https://dev.ems.lahendus.ut.ee', 'https://dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee', read_token,
+    ez = Ez('dev.ems.lahendus.ut.ee', 'dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee', read_token,
             write_tokens, logging_level=logging.DEBUG)
     print(ez.student.get_courses())
-    print(ez.student.post_submission('7', '181', 'print("ez!")'))
+    # print(ez.student.post_submission('7', '181', 'print("ez!")'))
     # print(ez.student.get_exercise_details("2", "1"))
