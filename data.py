@@ -29,6 +29,11 @@ class Resp:
 
 
 @dataclass
+class EmptyResp(Resp):
+    pass
+
+
+@dataclass
 class ExerciseDetailsResp(Resp):
     effective_title: str = None,
     text_html: str = None,

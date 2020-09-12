@@ -1,5 +1,4 @@
 import dataclasses
-import json
 import logging
 import socket
 import threading
@@ -46,11 +45,13 @@ class RequestUtil:
         assert isinstance(dto, response_dto_class)
         return dto
 
-    # TODO. can also return DTO from this
-    def post_request(self, path: str, request_dto_dataclass: T.Any) -> int:
-        json_data = json.dumps(dataclasses.asdict(request_dto_dataclass)).encode("utf-8")
-        resp: requests.Response = requests.post(self.api_url + path, data=json_data, headers=self.get_token_header())
-        return resp.status_code
+    def post_request(self, path: str, request_dto_dataclass: T.Any,
+                     resp_code_to_dto_class: T.Dict[int, T.Type[T.Any]]) -> T.Any:
+        req_body_dict = dataclasses.asdict(request_dto_dataclass)
+        resp: requests.Response = requests.post(self.api_url + path, json=req_body_dict,
+                                                headers=self.get_token_header())
+        dto = util.handle_response(resp, resp_code_to_dto_class)
+        return dto
 
     def get_token_header(self) -> T.Dict[str, str]:
         access_token_file, expires_at = self.retrieve_tokens(data.Token.ACCESS)
@@ -203,7 +204,7 @@ class Student:
             solution: str
 
         path = f"/student/courses/{course_id}/exercises/{course_exercise_id}/submissions"
-        return self.request_util.post_request(path, Submission(solution))
+        return self.request_util.post_request(path, Submission(solution), {200: data.EmptyResp})
 
 
 class Teacher:
@@ -256,4 +257,5 @@ if __name__ == '__main__':
     ez = Ez('https://dev.ems.lahendus.ut.ee', 'https://dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee', read_token,
             write_tokens, logging_level=logging.DEBUG)
     print(ez.student.get_courses())
+    print(ez.student.post_submission('7', '181', 'print("ez!")'))
     # print(ez.student.get_exercise_details("2", "1"))
