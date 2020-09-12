@@ -4,7 +4,6 @@ import logging
 import time
 import typing as T
 from dataclasses import dataclass
-from typing import Callable, Dict, Tuple
 
 import requests
 
@@ -20,31 +19,32 @@ logging.basicConfig(format='%(asctime)s - %(message)s-%(levelname)s', level=logg
 
 # TODO:
 # Callable -> Type for classes?
-# typing -> T
 # conf
 # logging from conf
 
 class RequestUtil:
     def __init__(self,
-                 retrieve_tokens: Callable[[data.Token], Tuple[str, int]],
-                 persist_tokens: Callable[[str, int, str], None]):
+                 retrieve_tokens: T.Callable[[data.Token], T.Tuple[str, int]],
+                 persist_tokens: T.Callable[[str, int, str], None]):
         self.retrieve_tokens = retrieve_tokens
         self.persist_tokens = persist_tokens
 
-    def simple_get_request(self, path: str, response_dto: Callable) -> T.Any:
+    def simple_get_request(self, path: str, response_dto_class: T.Type[T.Any]) -> T.Any:
         resp: requests.Response = requests.get(path, headers=self.get_token_header())
-        dto = util.handle_response(resp, {200: response_dto})
-        assert isinstance(dto, response_dto)
+        dto = util.handle_response(resp, {200: response_dto_class})
+        assert isinstance(dto, response_dto_class)
         return dto
 
-    def post_request(self, path: str, req_object: T.Any) -> int:
-        data = json.dumps(dataclasses.asdict(req_object)).encode("utf-8")
-        resp: requests.Response = requests.post(path, data=data, headers=self.get_token_header())
+    # TODO. can also return DTO from this
+    def post_request(self, path: str, request_dto_dataclass: T.Any) -> int:
+        json_data = json.dumps(dataclasses.asdict(request_dto_dataclass)).encode("utf-8")
+        resp: requests.Response = requests.post(path, data=json_data, headers=self.get_token_header())
         return resp.status_code
 
-    def get_token_header(self) -> Dict[str, str]:
+    def get_token_header(self) -> T.Dict[str, str]:
         access_token_file, expires_at = self.retrieve_tokens(data.Token.ACCESS)
 
+        # TODO: make sure and test that we account for clock skew
         if access_token_file is None or time.time() > expires_at + conf.AUTH_TOKEN_MIN_VALID_SEC:
             auth.auth(self.retrieve_tokens, self.persist_tokens)
             access_token_file, expires_at = self.retrieve_tokens(data.Token.ACCESS)
@@ -128,8 +128,8 @@ class Teacher:
 
 class Ez:
     def __init__(self,
-                 retrieve_tokens: Callable[[data.Token], Tuple[str, int]],
-                 persist_tokens: Callable[[str, int, str], None]):
+                 retrieve_tokens: T.Callable[[data.Token], T.Tuple[str, int]],
+                 persist_tokens: T.Callable[[str, int, str], None]):
         self.util = RequestUtil(retrieve_tokens, persist_tokens)
         self.student: Student = Student(conf.BASE_URL, self.util)
         self.teacher: Teacher = Teacher(conf.BASE_URL, self.util)

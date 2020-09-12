@@ -1,5 +1,5 @@
+import typing as T
 from dataclasses import dataclass
-from typing import Dict
 
 from requests import Response
 
@@ -8,7 +8,7 @@ from requests import Response
 class ErrorResp:
     id: str
     code: str
-    attrs: Dict[str, str]
+    attrs: T.Dict[str, str]
     log_msg: str
 
 

@@ -1,12 +1,12 @@
 import json
 import os
 import time
-from typing import Tuple, Dict
+import typing as T
 
 import data
 
 
-def read_token(token_type: data.Token) -> Tuple[str, int]:
+def read_token(token_type: data.Token) -> T.Tuple[str, int]:
     token_file, expires_at = None, 0
 
     if os.path.isfile(token_type.value):
@@ -40,7 +40,7 @@ def write_restricted_file(file_name, file_content):
         f.write(file_content)
 
 
-def get_student_testing_header() -> Dict[str, str]:
+def get_student_testing_header() -> T.Dict[str, str]:
     return {"Content-Type": "application/json",
             "oidc_claim_easy_role": "student",
             "oidc_claim_email": "foo@bar.com",
@@ -49,7 +49,7 @@ def get_student_testing_header() -> Dict[str, str]:
             "oidc_claim_preferred_username": "fp"}
 
 
-def get_teacher_testing_header() -> Dict[str, str]:
+def get_teacher_testing_header() -> T.Dict[str, str]:
     return {"Content-Type": "application/json",
             "oidc_claim_easy_role": "teacher",
             "oidc_claim_email": "foo@bar.com",

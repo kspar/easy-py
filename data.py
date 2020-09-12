@@ -1,6 +1,6 @@
+import typing as T
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
 
 import requests
 
@@ -46,7 +46,7 @@ class StudentCourse:
 
 @dataclass
 class StudentCourseResp(Resp):
-    courses: List[StudentCourse] = None
+    courses: T.List[StudentCourse] = None
 
 
 @dataclass
@@ -63,7 +63,7 @@ class SubmissionResp(Resp):
 
 @dataclass
 class StudentAllSubmissionsResp(Resp):
-    submissions: List[SubmissionResp] = None,
+    submissions: T.List[SubmissionResp] = None,
     count: int = None
 
 
@@ -76,4 +76,4 @@ class TeacherCourse:
 
 @dataclass
 class TeacherCourseResp(Resp):
-    courses: List[TeacherCourse] = None
+    courses: T.List[TeacherCourse] = None

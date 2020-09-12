@@ -1,8 +1,8 @@
 import logging
 import socket
 import threading
+import typing as T
 import webbrowser
-from typing import Callable, Tuple
 
 import requests
 from flask import Flask, request, Response, render_template
@@ -25,8 +25,8 @@ def _get_free_port() -> int:
     raise OSError(f"Unable to bind to ports {conf.AUTH_PORT_RANGE_FIRST} - {conf.AUTH_PORT_RANGE_LAST}")
 
 
-def _refresh_using_refresh_token(retrieve_tokens: Callable[[data.Token], Tuple[str, int]],
-                                 persist_tokens: Callable[[str, int, str], None]) -> bool:
+def _refresh_using_refresh_token(retrieve_tokens: T.Callable[[data.Token], T.Tuple[str, int]],
+                                 persist_tokens: T.Callable[[str, int, str], None]) -> bool:
     refresh_token, _ = retrieve_tokens(data.Token.REFRESH)
 
     if refresh_token is None:
@@ -54,8 +54,8 @@ def _refresh_using_refresh_token(retrieve_tokens: Callable[[data.Token], Tuple[s
         return False
 
 
-def auth(retrieve_tokens: Callable[[data.Token], Tuple[str, int]],
-         persist_tokens: Callable[[str, int, str], None]):
+def auth(retrieve_tokens: T.Callable[[data.Token], T.Tuple[str, int]],
+         persist_tokens: T.Callable[[str, int, str], None]):
     app = Flask(__name__)
 
     def shutdown_server():
