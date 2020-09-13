@@ -15,6 +15,7 @@ from flask import Flask, request, Response, render_template
 
 import data
 import util
+from exceptions import AuthRequiredException
 
 API_VERSION_PREFIX = '/v2'
 
@@ -56,10 +57,15 @@ class RequestUtil:
         self.persist_token = persist_token
 
     def simple_get_request(self, path: str, response_dto_class: T.Type[T.Any]) -> T.Any:
-        resp: requests.Response = requests.get(self.api_url + path, headers=self.get_token_header())
-        # TODO: force reauth (auth()) if status 401
-        dto = util.handle_response(resp, {200: response_dto_class})
+        dto = self.get_request(path, {200: response_dto_class})
         assert isinstance(dto, response_dto_class)
+        return dto
+
+    def get_request(self, path: str, resp_code_to_dto_class: T.Dict[int, T.Type[T.Any]]) -> T.Any:
+        resp: requests.Response = requests.get(self.api_url + path, headers=self.get_token_header())
+        if resp.status_code == 401:
+            raise AuthRequiredException()
+        dto = util.handle_response(resp, resp_code_to_dto_class)
         return dto
 
     def post_request(self, path: str, request_dto_dataclass: T.Any,
@@ -67,7 +73,8 @@ class RequestUtil:
         req_body_dict = dataclasses.asdict(request_dto_dataclass)
         resp: requests.Response = requests.post(self.api_url + path, json=req_body_dict,
                                                 headers=self.get_token_header())
-        # TODO: force reauth (auth()) if status 401
+        if resp.status_code == 401:
+            raise AuthRequiredException()
         dto = util.handle_response(resp, resp_code_to_dto_class)
         return dto
 
@@ -76,27 +83,49 @@ class RequestUtil:
 
     def get_valid_access_token(self) -> StorableToken:
         access_token = self.get_stored_token(TokenType.ACCESS)
-        # TODO: make sure and test that we account for clock skew
-        if access_token is None or time.time() > access_token.expires_at + self.auth_token_min_valid_sec:
-            self.auth()
-            access_token = self.get_stored_token(TokenType.ACCESS)
-
-            if access_token is None or time.time() > access_token.expires_at + self.auth_token_min_valid_sec:
-                raise RuntimeError("Could not get/refresh tokens")
+        if not self.access_token_is_valid(access_token):
+            if self._refresh_using_refresh_token():
+                access_token = self.get_stored_token(TokenType.ACCESS)
+                assert self.access_token_is_valid(access_token), 'Access token is not valid after refreshing'
+            else:
+                raise AuthRequiredException()
 
         return access_token
 
-    def get_stored_token(self, token_type: TokenType) -> T.Optional[StorableToken]:
-        token_dict = self.retrieve_token(token_type)
-        if token_dict is None:
-            return None
-        if token_dict is not None:
-            return StorableToken(**token_dict)
+    def access_token_is_valid(self, access_token: T.Optional[StorableToken]):
+        return access_token is not None and time.time() <= access_token.expires_at + self.auth_token_min_valid_sec
 
-    def set_stored_token(self, token_type: TokenType, token: StorableToken):
-        self.persist_token(token_type, dataclasses.asdict(token))
+    def _refresh_using_refresh_token(self) -> bool:
+        refresh_token = self.get_stored_token(TokenType.REFRESH)
 
-    def auth(self):
+        if refresh_token is None:
+            logging.debug("No refresh token found")
+            return False
+
+        token_req_body = {
+            'grant_type': "refresh_token",
+            'refresh_token': refresh_token.token,
+            'client_id': self.idp_client_name
+        }
+
+        r = requests.post(f"{self.idp_url}/auth/realms/master/protocol/openid-connect/token", data=token_req_body)
+
+        if r.status_code == 200:
+            body = r.json()
+            access_token = StorableToken(TokenType.ACCESS, body["access_token"],
+                                         round(time.time()) + int(body['expires_in']))
+            refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
+                                          round(time.time()) + int(body['refresh_expires_in']))
+
+            self.set_stored_token(TokenType.ACCESS, access_token)
+            self.set_stored_token(TokenType.REFRESH, refresh_token)
+            logging.info("Refreshed tokens using refresh token")
+            return True
+        else:
+            logging.info(f"Refreshing tokens failed with status {r.status_code}")
+            return False
+
+    def auth_in_browser(self):
         app = Flask(__name__, template_folder=os.path.abspath('auth-templates'))
 
         # Disable Flask banner
@@ -135,9 +164,6 @@ class RequestUtil:
             finally:
                 shutdown_server()
 
-        if self._refresh_using_refresh_token():
-            return
-
         host, port = "127.0.0.1", self._get_free_port()
         url = f'http://{host}:{port}/login'
         thread = threading.Thread(target=app.run, args=(host, port, False, False,))
@@ -147,36 +173,6 @@ class RequestUtil:
 
         thread.start()
         thread.join()
-
-    def _refresh_using_refresh_token(self) -> bool:
-        refresh_token = self.get_stored_token(TokenType.REFRESH)
-
-        if refresh_token is None:
-            logging.debug("No refresh token found")
-            return False
-
-        token_req_body = {
-            'grant_type': "refresh_token",
-            'refresh_token': refresh_token.token,
-            'client_id': self.idp_client_name
-        }
-
-        r = requests.post(f"{self.idp_url}/auth/realms/master/protocol/openid-connect/token", data=token_req_body)
-
-        if r.status_code == 200:
-            body = r.json()
-            access_token = StorableToken(TokenType.ACCESS, body["access_token"],
-                                         round(time.time()) + int(body['expires_in']))
-            refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
-                                          round(time.time()) + int(body['refresh_expires_in']))
-
-            self.set_stored_token(TokenType.ACCESS, access_token)
-            self.set_stored_token(TokenType.REFRESH, refresh_token)
-            logging.info("Refreshed tokens using refresh token")
-            return True
-        else:
-            logging.info(f"Refreshing tokens failed with status {r.status_code}")
-            return False
 
     def _get_free_port(self) -> int:
         for p in range(self.auth_port_range_first, self.auth_port_range_last + 1):
@@ -190,6 +186,16 @@ class RequestUtil:
                 pass
 
         raise OSError(f"Unable to bind to ports {self.auth_port_range_first} - {self.auth_port_range_last}")
+
+    def get_stored_token(self, token_type: TokenType) -> T.Optional[StorableToken]:
+        token_dict = self.retrieve_token(token_type)
+        if token_dict is None:
+            return None
+        if token_dict is not None:
+            return StorableToken(**token_dict)
+
+    def set_stored_token(self, token_type: TokenType, token: StorableToken):
+        self.persist_token(token_type, dataclasses.asdict(token))
 
 
 class Student:
@@ -264,8 +270,6 @@ class Teacher:
 # TODO: hide private fields/methods
 # TODO: should use TokenStorer type/class instead of functions?
 # TODO: add logging and check whether the current levels make sense
-# TODO: should not automatically reauth via browser if tokens are not usable, instead let the caller decide
-# TODO: open browser in new window
 class Ez:
     def __init__(self,
                  api_base_url: str,
@@ -311,3 +315,13 @@ class Ez:
         self.teacher: Teacher = Teacher(self.util)
 
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s : %(message)s', level=logging_level)
+
+    def auth_in_browser(self):
+        self.util.auth_in_browser()
+
+    def is_auth_required(self) -> bool:
+        try:
+            self.util.get_valid_access_token()
+            return False
+        except AuthRequiredException:
+            return True

@@ -44,6 +44,11 @@ if __name__ == '__main__':
               gen_write_token_to_file(path_provider, namer),
               auth_browser_success_msg=success_msg,
               logging_level=logging.INFO)
+
+    if ez.is_auth_required():
+        print('auth is required')
+        ez.auth_in_browser()
+
     print(ez.student.get_courses())
     # print(ez.student.post_submission('7', '181', 'print("ez!")'))
     # print(ez.student.get_exercise_details("2", "1"))

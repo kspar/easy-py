@@ -19,3 +19,9 @@ class ErrorResponseException(Exception):
         self.nested_ex = nested_exception
         # TODO: is this necessary?
         super().__init__(self.resp, error_resp, nested_exception)
+
+
+class AuthRequiredException(Exception):
+    def __init__(self):
+        self.msg = 'Authentication is required. Call Ez.auth_in_browser() to start authentication.'
+        super().__init__(self.msg)
