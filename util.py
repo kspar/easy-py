@@ -40,3 +40,10 @@ def handle_response(resp: requests.Response, code_to_dto_class: T.Dict[int, T.Ty
             nested_exception = e
 
         raise ErrorResponseException(resp, error_rsp, nested_exception)
+
+
+def normalise_url(url: str) -> str:
+    norm_url = url
+    if not norm_url.startswith('http'):
+        norm_url = 'https://' + norm_url
+    return norm_url.rstrip('/')

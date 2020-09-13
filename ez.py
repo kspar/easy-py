@@ -280,17 +280,11 @@ class Ez:
         def in_memory_persist_token(token_type, token):
             local_token_store[token_type] = token
 
-        if not api_base_url.startswith('http'):
-            api_base_url = 'https://' + api_base_url
-        api_base_url = api_base_url.rstrip('/')
-        versioned_api_url = api_base_url + API_VERSION_PREFIX
+        versioned_api_url = util.normalise_url(api_base_url) + API_VERSION_PREFIX
+        normalised_idp_url = util.normalise_url(idp_url)
 
-        if not idp_url.startswith('http'):
-            idp_url = 'https://' + idp_url
-        idp_url = idp_url.rstrip('/')
-
-        self.util = RequestUtil(versioned_api_url, idp_url, idp_client_name, auth_token_min_valid_sec,
-                                auth_port_range_first, auth_port_range_last,
+        self.util = RequestUtil(versioned_api_url, normalised_idp_url, idp_client_name,
+                                auth_token_min_valid_sec, auth_port_range_first, auth_port_range_last,
                                 retrieve_token if retrieve_token is not None else in_memory_retrieve_token,
                                 persist_token if persist_token is not None else in_memory_persist_token)
         self.student: Student = Student(self.util)
