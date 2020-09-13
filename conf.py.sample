@@ -1,9 +1,0 @@
-BASE_URL = 'http://dev.ems.lahendus.ut.ee/v2'
-
-IDP_URL = 'https://dev.idp.lahendus.ut.ee'
-IDP_CLIENT_NAME = 'dev.lahendus.ut.ee'
-
-AUTH_PORT_RANGE_FIRST = 5100
-AUTH_PORT_RANGE_LAST = 5109
-AUTH_TOKEN_MIN_VALID_SEC = 20
-
