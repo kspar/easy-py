@@ -14,15 +14,19 @@ from flask import Flask, request, Response, render_template
 import data
 import util
 
-# TODO:
-# hide private fields/methods
-
 API_VERSION_PREFIX = '/v2'
 
 
-class Token(Enum):
+class TokenType(str, Enum):
     ACCESS = "access_token"
     REFRESH = "refresh_token"
+
+
+@dataclass
+class StorableToken:
+    token_type: TokenType
+    token: str
+    expires_at: int
 
 
 class RequestUtil:
@@ -33,8 +37,8 @@ class RequestUtil:
                  auth_token_min_valid_sec: int,
                  auth_port_range_first: int,
                  auth_port_range_last: int,
-                 retrieve_tokens: T.Callable[[Token], T.Tuple[str, int]],
-                 persist_tokens: T.Callable[[str, int, str], None]):
+                 retrieve_tokens: T.Callable[[TokenType], T.Optional[dict]],
+                 persist_tokens: T.Callable[[TokenType, dict], None]):
 
         self.api_url = api_url
         self.idp_url = idp_url
@@ -62,17 +66,29 @@ class RequestUtil:
         return dto
 
     def get_token_header(self) -> T.Dict[str, str]:
-        access_token_file, expires_at = self.retrieve_tokens(Token.ACCESS)
+        return {"Authorization": f"Bearer {self.get_valid_access_token().token}"}
 
+    def get_valid_access_token(self) -> StorableToken:
+        access_token = self.get_stored_token(TokenType.ACCESS)
         # TODO: make sure and test that we account for clock skew
-        if access_token_file is None or time.time() > expires_at + self.auth_token_min_valid_sec:
+        if access_token is None or time.time() > access_token.expires_at + self.auth_token_min_valid_sec:
             self.auth()
-            access_token_file, expires_at = self.retrieve_tokens(Token.ACCESS)
+            access_token = self.get_stored_token(TokenType.ACCESS)
 
-            if access_token_file is None or time.time() > expires_at + self.auth_token_min_valid_sec:
+            if access_token is None or time.time() > access_token.expires_at + self.auth_token_min_valid_sec:
                 raise RuntimeError("Could not get/refresh tokens")
 
-        return {"Authorization": f"Bearer {access_token_file[Token.ACCESS.value]}"}
+        return access_token
+
+    def get_stored_token(self, token_type: TokenType) -> T.Optional[StorableToken]:
+        token_dict = self.retrieve_tokens(token_type)
+        if token_dict is None:
+            return None
+        if token_dict is not None:
+            return StorableToken(**token_dict)
+
+    def set_stored_token(self, token_type: TokenType, token: StorableToken):
+        self.persist_tokens(token_type, dataclasses.asdict(token))
 
     def auth(self):
         app = Flask(__name__)
@@ -96,10 +112,12 @@ class RequestUtil:
             try:
                 if request.is_json:
                     body = request.get_json()
-                    self.persist_tokens(body[Token.ACCESS.value],
-                                        int(body['access_token_valid_sec']),
-                                        body[Token.REFRESH.value])
-
+                    access_token = StorableToken(TokenType.ACCESS, body["access_token"],
+                                                 round(time.time()) + int(body['access_token_valid_sec']))
+                    refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
+                                                  round(time.time()) + int(body['refresh_token_valid_sec']))
+                    self.set_stored_token(TokenType.ACCESS, access_token)
+                    self.set_stored_token(TokenType.REFRESH, refresh_token)
                     return Response(status=200)
                 else:
                     return Response(status=400)
@@ -109,18 +127,18 @@ class RequestUtil:
         if self._refresh_using_refresh_token():
             return
 
-        local, port = "127.0.0.1", self._get_free_port()
-        url = f'http://{local}:{port}/login'
-        thread = threading.Thread(target=app.run, args=(local, port, False, False,))
+        host, port = "127.0.0.1", self._get_free_port()
+        url = f'http://{host}:{port}/login'
+        thread = threading.Thread(target=app.run, args=(host, port, False, False,))
 
-        # Assume the server starts in 1 second
-        threading.Timer(1, lambda: webbrowser.open(url)).start()
+        # Assume the server starts in 2 seconds
+        threading.Timer(2, lambda: webbrowser.open(url)).start()
 
         thread.start()
         thread.join()
 
     def _refresh_using_refresh_token(self) -> bool:
-        refresh_token, _ = self.retrieve_tokens(Token.REFRESH)
+        refresh_token = self.get_stored_token(TokenType.REFRESH)
 
         if refresh_token is None:
             logging.debug("No refresh token found")
@@ -128,22 +146,25 @@ class RequestUtil:
 
         token_req_body = {
             'grant_type': "refresh_token",
-            'refresh_token': refresh_token,
+            'refresh_token': refresh_token.token,
             'client_id': self.idp_client_name
         }
 
         r = requests.post(f"{self.idp_url}/auth/realms/master/protocol/openid-connect/token", data=token_req_body)
 
         if r.status_code == 200:
-            resp_body = r.json()
-            self.persist_tokens(resp_body[Token.ACCESS.value],
-                                resp_body['expires_in'],
-                                resp_body[Token.REFRESH.value])
+            body = r.json()
+            access_token = StorableToken(TokenType.ACCESS, body["access_token"],
+                                         round(time.time()) + int(body['expires_in']))
+            refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
+                                          round(time.time()) + int(body['refresh_expires_in']))
 
-            logging.debug("Refreshed tokens using refresh token")
+            self.set_stored_token(TokenType.ACCESS, access_token)
+            self.set_stored_token(TokenType.REFRESH, refresh_token)
+            logging.info("Refreshed tokens using refresh token")
             return True
         else:
-            logging.warning(f"Refreshing tokens failed with status {r.status_code}")
+            logging.info(f"Refreshing tokens failed with status {r.status_code}")
             return False
 
     def _get_free_port(self) -> int:
@@ -230,15 +251,15 @@ class Teacher:
 
 
 # TODO: token methods to optional
-# TODO: are there attributes to store with refresh token? store as dict either way, make the token funs signatures nicer
 # TODO: hide flask banner
+# TODO: hide private fields/methods
 class Ez:
     def __init__(self,
                  api_base_url: str,
                  idp_url: str,
                  idp_client_name: str,
-                 retrieve_tokens: T.Callable[[Token], T.Tuple[str, int]],
-                 persist_tokens: T.Callable[[str, int, str], None],
+                 retrieve_tokens: T.Callable[[TokenType], T.Optional[dict]],
+                 persist_tokens: T.Callable[[TokenType, dict], None],
                  auth_token_min_valid_sec: int = 20,
                  auth_port_range_first: int = 5100,
                  auth_port_range_last: int = 5109,

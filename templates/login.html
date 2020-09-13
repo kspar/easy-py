@@ -22,10 +22,14 @@
         const accessTokenValidSec = kc.tokenParsed.exp - kc.tokenParsed.iat;
         console.debug("Access token valid for: " + accessTokenValidSec);
 
+        const refreshTokenValidSec = kc.refreshTokenParsed.exp - kc.refreshTokenParsed.iat;
+        console.debug("Refresh token valid for: " + refreshTokenValidSec);
+
         const tokenBody = {
             access_token: kc.token,
             access_token_valid_sec: accessTokenValidSec,
-            refresh_token: kc.refreshToken
+            refresh_token: kc.refreshToken,
+            refresh_token_valid_sec: refreshTokenValidSec
         };
 
         const container = document.getElementById("container");

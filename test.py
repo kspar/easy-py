@@ -1,7 +1,7 @@
 import logging
 import typing as T
 
-from defaults import read_token, write_tokens
+from defaults import read_token_from_file, write_token_to_file
 from ez import Ez
 
 
@@ -32,8 +32,8 @@ if __name__ == '__main__':
     # print(ez.student.post_submission("1", "1", "solution1"))
     # print(ez.teacher.get_courses())
 
-    ez = Ez('dev.ems.lahendus.ut.ee', 'dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee', read_token,
-            write_tokens, logging_level=logging.DEBUG)
+    ez = Ez('dev.ems.lahendus.ut.ee', 'dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee', read_token_from_file,
+            write_token_to_file, logging_level=logging.INFO)
     print(ez.student.get_courses())
     # print(ez.student.post_submission('7', '181', 'print("ez!")'))
     # print(ez.student.get_exercise_details("2", "1"))
