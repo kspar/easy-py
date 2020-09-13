@@ -270,6 +270,8 @@ class Teacher:
 # TODO: hide private fields/methods
 # TODO: should use TokenStorer type/class instead of functions?
 # TODO: add logging and check whether the current levels make sense
+# TODO: what to do when browser-auth has started, the server is running but the browser window was closed by user?
+# TODO: check that argument validation is reasonable for service functions
 class Ez:
     def __init__(self,
                  api_base_url: str,
@@ -284,7 +286,7 @@ class Ez:
                  auth_browser_fail_msg: str = "Something failed... did you try turning it off and on again?",
                  logging_level: int = logging.INFO):
         """
-        TODO
+        TODO: doc
         :param logging_level: default logging level, e.g. logging.DEBUG. Default: logging.INFO
         """
         # Both must be either None or defined

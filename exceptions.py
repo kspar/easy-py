@@ -17,7 +17,7 @@ class ErrorResponseException(Exception):
         self.resp = resp
         self.error_resp = error_resp
         self.nested_ex = nested_exception
-        # TODO: is this necessary?
+        # TODO: is super().__init__ necessary?
         super().__init__(self.resp, error_resp, nested_exception)
 
 
