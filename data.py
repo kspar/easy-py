@@ -7,7 +7,7 @@ import requests
 
 class AutogradeStatus(Enum):
     NONE = "NONE"
-    IN_PROGRESS = "IN_PRGRESS"
+    IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
