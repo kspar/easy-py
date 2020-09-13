@@ -3,6 +3,25 @@ import logging
 from defaults import read_token, write_tokens
 from ez import Ez
 
+
+def get_student_testing_header() -> T.Dict[str, str]:
+    return {"Content-Type": "application/json",
+            "oidc_claim_easy_role": "student",
+            "oidc_claim_email": "foo@bar.com",
+            "oidc_claim_given_name": "Foo",
+            "oidc_claim_family_name": "Bar",
+            "oidc_claim_preferred_username": "fp"}
+
+
+def get_teacher_testing_header() -> T.Dict[str, str]:
+    return {"Content-Type": "application/json",
+            "oidc_claim_easy_role": "teacher",
+            "oidc_claim_email": "foo@bar.com",
+            "oidc_claim_given_name": "Foo",
+            "oidc_claim_family_name": "Bar",
+            "oidc_claim_preferred_username": "fp"}
+
+
 # TODO: rm after implementation
 if __name__ == '__main__':
     # print(ez.student.get_courses())

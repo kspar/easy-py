@@ -38,21 +38,3 @@ def get_file_content(file_name) -> str:
 def write_restricted_file(file_name, file_content):
     with open(os.open(file_name, os.O_CREAT | os.O_WRONLY, 0o600), "w") as f:
         f.write(file_content)
-
-
-def get_student_testing_header() -> T.Dict[str, str]:
-    return {"Content-Type": "application/json",
-            "oidc_claim_easy_role": "student",
-            "oidc_claim_email": "foo@bar.com",
-            "oidc_claim_given_name": "Foo",
-            "oidc_claim_family_name": "Bar",
-            "oidc_claim_preferred_username": "fp"}
-
-
-def get_teacher_testing_header() -> T.Dict[str, str]:
-    return {"Content-Type": "application/json",
-            "oidc_claim_easy_role": "teacher",
-            "oidc_claim_email": "foo@bar.com",
-            "oidc_claim_given_name": "Foo",
-            "oidc_claim_family_name": "Bar",
-            "oidc_claim_preferred_username": "fp"}
