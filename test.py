@@ -1,8 +1,8 @@
 import logging
 import typing as T
 
-from defaults import read_token_from_file, write_token_to_file
-from ez import Ez
+import ez as e
+from defaults import gen_read_token_from_file, gen_write_token_to_file
 
 
 def get_student_testing_header() -> T.Dict[str, str]:
@@ -32,8 +32,13 @@ if __name__ == '__main__':
     # print(ez.student.post_submission("1", "1", "solution1"))
     # print(ez.teacher.get_courses())
 
-    ez = Ez('dev.ems.lahendus.ut.ee', 'dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee', read_token_from_file,
-            write_token_to_file, logging_level=logging.INFO)
+    path_provider = lambda _: 'ez-dev-tokens'
+    namer = lambda tt: tt.value + '.json'
+
+    ez = e.Ez('dev.ems.lahendus.ut.ee', 'dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee',
+              gen_read_token_from_file(path_provider, namer),
+              gen_write_token_to_file(path_provider, namer),
+              logging_level=logging.INFO)
     print(ez.student.get_courses())
     # print(ez.student.post_submission('7', '181', 'print("ez!")'))
     # print(ez.student.get_exercise_details("2", "1"))

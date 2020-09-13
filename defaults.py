@@ -5,19 +5,29 @@ import typing as T
 import ez
 
 
-# TODO: both to gen-style 2nd-order funs to customise file path
+def gen_read_token_from_file(storage_path_provider: T.Callable[[ez.TokenType], str],
+                             namer: T.Callable[[ez.TokenType], str]):
+    def read_token_from_file(token_type: ez.TokenType) -> T.Optional[dict]:
+        path = os.path.join(storage_path_provider(token_type), namer(token_type))
+        if os.path.isfile(path):
+            try:
+                return json.loads(get_file_content(path).strip())
+            except json.JSONDecodeError:
+                pass
+        return None
 
-def read_token_from_file(token_type: ez.TokenType) -> T.Optional[dict]:
-    if os.path.isfile(token_type.value):
-        try:
-            return json.loads(get_file_content(token_type.value).strip())
-        except json.JSONDecodeError:
-            pass
-    return None
+    return read_token_from_file
 
 
-def write_token_to_file(token_type: ez.TokenType, token: dict):
-    write_restricted_file(token_type.value, json.dumps(token, sort_keys=True, indent=2))
+def gen_write_token_to_file(storage_path_provider: T.Callable[[ez.TokenType], str],
+                            namer: T.Callable[[ez.TokenType], str]):
+    def write_token_to_file(token_type: ez.TokenType, token: dict):
+        containing_dir = storage_path_provider(token_type)
+        os.makedirs(containing_dir, exist_ok=True)
+        path = os.path.join(containing_dir, namer(token_type))
+        write_restricted_file(path, json.dumps(token, sort_keys=True, indent=2))
+
+    return write_token_to_file
 
 
 def get_file_content(file_name) -> str:
