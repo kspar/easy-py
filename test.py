@@ -34,10 +34,15 @@ if __name__ == '__main__':
 
     path_provider = lambda _: 'ez-dev-tokens'
     namer = lambda tt: tt.value + '.json'
+    success_msg = '''
+    Autentimine õnnestus!
+    Nüüd võid selle brauseriakna sulgeda.
+    '''
 
     ez = e.Ez('dev.ems.lahendus.ut.ee', 'dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee',
               gen_read_token_from_file(path_provider, namer),
               gen_write_token_to_file(path_provider, namer),
+              auth_browser_success_msg=success_msg,
               logging_level=logging.INFO)
     print(ez.student.get_courses())
     # print(ez.student.post_submission('7', '181', 'print("ez!")'))

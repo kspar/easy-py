@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import os
 import socket
 import sys
 import threading
@@ -38,6 +39,8 @@ class RequestUtil:
                  auth_token_min_valid_sec: int,
                  auth_port_range_first: int,
                  auth_port_range_last: int,
+                 auth_browser_success_msg: str,
+                 auth_browser_fail_msg: str,
                  retrieve_token: T.Callable[[TokenType], T.Optional[dict]],
                  persist_token: T.Callable[[TokenType, dict], None]):
 
@@ -47,6 +50,8 @@ class RequestUtil:
         self.auth_token_min_valid_sec = auth_token_min_valid_sec
         self.auth_port_range_first = auth_port_range_first
         self.auth_port_range_last = auth_port_range_last
+        self.auth_browser_success_msg = auth_browser_success_msg
+        self.auth_browser_fail_msg = auth_browser_fail_msg
         self.retrieve_token = retrieve_token
         self.persist_token = persist_token
 
@@ -92,7 +97,7 @@ class RequestUtil:
         self.persist_token(token_type, dataclasses.asdict(token))
 
     def auth(self):
-        app = Flask(__name__)
+        app = Flask(__name__, template_folder=os.path.abspath('auth-templates'))
 
         # Disable Flask banner
         cli = sys.modules['flask.cli']
@@ -110,7 +115,8 @@ class RequestUtil:
 
         @app.route('/login')
         def controller_login():
-            return render_template("login.html", idp_url=self.idp_url, port=port)
+            return render_template("login.html", idp_url=self.idp_url, port=port,
+                                   success_msg=self.auth_browser_success_msg, fail_msg=self.auth_browser_fail_msg)
 
         @app.route('/deliver-tokens', methods=['POST'])
         def controller_deliver_tokens():
@@ -258,6 +264,8 @@ class Teacher:
 # TODO: hide private fields/methods
 # TODO: should use TokenStorer type/class instead of functions?
 # TODO: add logging and check whether the current levels make sense
+# TODO: should not automatically reauth via browser if tokens are not usable, instead let the caller decide
+# TODO: open browser in new window
 class Ez:
     def __init__(self,
                  api_base_url: str,
@@ -268,6 +276,8 @@ class Ez:
                  auth_token_min_valid_sec: int = 20,
                  auth_port_range_first: int = 5100,
                  auth_port_range_last: int = 5109,
+                 auth_browser_success_msg: str = "Authentication was successful! You can now close this page.",
+                 auth_browser_fail_msg: str = "Something failed... did you try turning it off and on again?",
                  logging_level: int = logging.INFO):
         """
         TODO
@@ -293,6 +303,8 @@ class Ez:
 
         self.util = RequestUtil(versioned_api_url, normalised_idp_url, idp_client_name,
                                 auth_token_min_valid_sec, auth_port_range_first, auth_port_range_last,
+                                auth_browser_success_msg.strip().replace('\n', ''),
+                                auth_browser_fail_msg.strip().replace('\n', ''),
                                 retrieve_token if retrieve_token is not None else in_memory_retrieve_token,
                                 persist_token if persist_token is not None else in_memory_persist_token)
         self.student: Student = Student(self.util)

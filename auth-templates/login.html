@@ -43,16 +43,16 @@
         })
             .then(response => {
                 if (response.ok) {
-                    container.textContent = "It's all good, man. You can now close this page.";
+                    container.textContent = "{{ success_msg }}";
                     window.close();
                 } else {
-                    container.textContent = "Something failed... did you try turning it off and on again?";
+                    container.textContent = "{{ fail_msg }}";
                 }
             });
 
     }).error(() => {
         console.error("Keycloak init failed");
-        document.getElementById("container").textContent = "Authentication failed... did you try turning it off and on again?";
+        document.getElementById("container").textContent = "{{ fail_msg }}";
     });
 
 </script>
