@@ -37,8 +37,8 @@ class RequestUtil:
                  auth_token_min_valid_sec: int,
                  auth_port_range_first: int,
                  auth_port_range_last: int,
-                 retrieve_tokens: T.Callable[[TokenType], T.Optional[dict]],
-                 persist_tokens: T.Callable[[TokenType, dict], None]):
+                 retrieve_token: T.Callable[[TokenType], T.Optional[dict]],
+                 persist_token: T.Callable[[TokenType, dict], None]):
 
         self.api_url = api_url
         self.idp_url = idp_url
@@ -46,8 +46,8 @@ class RequestUtil:
         self.auth_token_min_valid_sec = auth_token_min_valid_sec
         self.auth_port_range_first = auth_port_range_first
         self.auth_port_range_last = auth_port_range_last
-        self.retrieve_tokens = retrieve_tokens
-        self.persist_tokens = persist_tokens
+        self.retrieve_token = retrieve_token
+        self.persist_token = persist_token
 
     def simple_get_request(self, path: str, response_dto_class: T.Type[T.Any]) -> T.Any:
         resp: requests.Response = requests.get(self.api_url + path, headers=self.get_token_header())
@@ -81,14 +81,14 @@ class RequestUtil:
         return access_token
 
     def get_stored_token(self, token_type: TokenType) -> T.Optional[StorableToken]:
-        token_dict = self.retrieve_tokens(token_type)
+        token_dict = self.retrieve_token(token_type)
         if token_dict is None:
             return None
         if token_dict is not None:
             return StorableToken(**token_dict)
 
     def set_stored_token(self, token_type: TokenType, token: StorableToken):
-        self.persist_tokens(token_type, dataclasses.asdict(token))
+        self.persist_token(token_type, dataclasses.asdict(token))
 
     def auth(self):
         app = Flask(__name__)
@@ -250,7 +250,6 @@ class Teacher:
         return self.request_util.simple_get_request(path, data.TeacherCourseResp)
 
 
-# TODO: token methods to optional
 # TODO: hide flask banner
 # TODO: hide private fields/methods
 class Ez:
@@ -258,8 +257,8 @@ class Ez:
                  api_base_url: str,
                  idp_url: str,
                  idp_client_name: str,
-                 retrieve_tokens: T.Callable[[TokenType], T.Optional[dict]],
-                 persist_tokens: T.Callable[[TokenType, dict], None],
+                 retrieve_token: T.Optional[T.Callable[[TokenType], T.Optional[dict]]] = None,
+                 persist_token: T.Optional[T.Callable[[TokenType, dict], None]] = None,
                  auth_token_min_valid_sec: int = 20,
                  auth_port_range_first: int = 5100,
                  auth_port_range_last: int = 5109,
@@ -268,6 +267,19 @@ class Ez:
         TODO
         :param logging_level: default logging level, e.g. logging.DEBUG. Default: logging.INFO
         """
+        # Both must be either None or defined
+        if (retrieve_token is None) != (persist_token is None):
+            raise ValueError('Both retrieve_token and persist_token must be either defined or None')
+
+        # Used for storing tokens by default
+        local_token_store = {}
+
+        def in_memory_retrieve_token(token_type):
+            return local_token_store[token_type] if token_type in local_token_store else None
+
+        def in_memory_persist_token(token_type, token):
+            local_token_store[token_type] = token
+
         if not api_base_url.startswith('http'):
             api_base_url = 'https://' + api_base_url
         api_base_url = api_base_url.rstrip('/')
@@ -278,7 +290,9 @@ class Ez:
         idp_url = idp_url.rstrip('/')
 
         self.util = RequestUtil(versioned_api_url, idp_url, idp_client_name, auth_token_min_valid_sec,
-                                auth_port_range_first, auth_port_range_last, retrieve_tokens, persist_tokens)
+                                auth_port_range_first, auth_port_range_last,
+                                retrieve_token if retrieve_token is not None else in_memory_retrieve_token,
+                                persist_token if persist_token is not None else in_memory_persist_token)
         self.student: Student = Student(self.util)
         self.teacher: Teacher = Teacher(self.util)
 
