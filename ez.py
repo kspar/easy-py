@@ -256,6 +256,8 @@ class Teacher:
 
 
 # TODO: hide private fields/methods
+# TODO: should use TokenStorer type/class instead of functions?
+# TODO: add logging and check whether the current levels make sense
 class Ez:
     def __init__(self,
                  api_base_url: str,
