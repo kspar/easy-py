@@ -6,18 +6,23 @@ import time
 import typing as T
 import webbrowser
 from dataclasses import dataclass
+from enum import Enum
 
 import requests
 from flask import Flask, request, Response, render_template
 
 import data
 import util
-from defaults import read_token, write_tokens
 
 # TODO:
 # hide private fields/methods
 
 API_VERSION_PREFIX = '/v2'
+
+
+class Token(Enum):
+    ACCESS = "access_token"
+    REFRESH = "refresh_token"
 
 
 class RequestUtil:
@@ -28,7 +33,7 @@ class RequestUtil:
                  auth_token_min_valid_sec: int,
                  auth_port_range_first: int,
                  auth_port_range_last: int,
-                 retrieve_tokens: T.Callable[[data.Token], T.Tuple[str, int]],
+                 retrieve_tokens: T.Callable[[Token], T.Tuple[str, int]],
                  persist_tokens: T.Callable[[str, int, str], None]):
 
         self.api_url = api_url
@@ -57,17 +62,17 @@ class RequestUtil:
         return dto
 
     def get_token_header(self) -> T.Dict[str, str]:
-        access_token_file, expires_at = self.retrieve_tokens(data.Token.ACCESS)
+        access_token_file, expires_at = self.retrieve_tokens(Token.ACCESS)
 
         # TODO: make sure and test that we account for clock skew
         if access_token_file is None or time.time() > expires_at + self.auth_token_min_valid_sec:
             self.auth()
-            access_token_file, expires_at = self.retrieve_tokens(data.Token.ACCESS)
+            access_token_file, expires_at = self.retrieve_tokens(Token.ACCESS)
 
             if access_token_file is None or time.time() > expires_at + self.auth_token_min_valid_sec:
                 raise RuntimeError("Could not get/refresh tokens")
 
-        return {"Authorization": f"Bearer {access_token_file[data.Token.ACCESS.value]}"}
+        return {"Authorization": f"Bearer {access_token_file[Token.ACCESS.value]}"}
 
     def auth(self):
         app = Flask(__name__)
@@ -91,9 +96,9 @@ class RequestUtil:
             try:
                 if request.is_json:
                     body = request.get_json()
-                    self.persist_tokens(body[data.Token.ACCESS.value],
+                    self.persist_tokens(body[Token.ACCESS.value],
                                         int(body['access_token_valid_sec']),
-                                        body[data.Token.REFRESH.value])
+                                        body[Token.REFRESH.value])
 
                     return Response(status=200)
                 else:
@@ -115,7 +120,7 @@ class RequestUtil:
         thread.join()
 
     def _refresh_using_refresh_token(self) -> bool:
-        refresh_token, _ = self.retrieve_tokens(data.Token.REFRESH)
+        refresh_token, _ = self.retrieve_tokens(Token.REFRESH)
 
         if refresh_token is None:
             logging.debug("No refresh token found")
@@ -131,9 +136,9 @@ class RequestUtil:
 
         if r.status_code == 200:
             resp_body = r.json()
-            self.persist_tokens(resp_body[data.Token.ACCESS.value],
+            self.persist_tokens(resp_body[Token.ACCESS.value],
                                 resp_body['expires_in'],
-                                resp_body[data.Token.REFRESH.value])
+                                resp_body[Token.REFRESH.value])
 
             logging.debug("Refreshed tokens using refresh token")
             return True
@@ -226,13 +231,13 @@ class Teacher:
 
 # TODO: token methods to optional
 # TODO: are there attributes to store with refresh token? store as dict either way, make the token funs signatures nicer
-# TODO: token enum should be in ez.py
+# TODO: hide flask banner
 class Ez:
     def __init__(self,
                  api_base_url: str,
                  idp_url: str,
                  idp_client_name: str,
-                 retrieve_tokens: T.Callable[[data.Token], T.Tuple[str, int]],
+                 retrieve_tokens: T.Callable[[Token], T.Tuple[str, int]],
                  persist_tokens: T.Callable[[str, int, str], None],
                  auth_token_min_valid_sec: int = 20,
                  auth_port_range_first: int = 5100,
@@ -257,19 +262,3 @@ class Ez:
         self.teacher: Teacher = Teacher(self.util)
 
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s : %(message)s', level=logging_level)
-
-
-# TODO: rm after implementation
-if __name__ == '__main__':
-    # print(ez.student.get_courses())
-    # print(ez.student.get_exercise_details("1", "1"))
-    # print(ez.student.get_latest_exercise_submission_details("1", "1"))
-    # print(ez.student.get_all_submissions("1", "1"))
-    # print(ez.student.post_submission("1", "1", "solution1"))
-    # print(ez.teacher.get_courses())
-
-    ez = Ez('dev.ems.lahendus.ut.ee', 'dev.idp.lahendus.ut.ee', 'dev.lahendus.ut.ee', read_token,
-            write_tokens, logging_level=logging.DEBUG)
-    print(ez.student.get_courses())
-    # print(ez.student.post_submission('7', '181', 'print("ez!")'))
-    # print(ez.student.get_exercise_details("2", "1"))

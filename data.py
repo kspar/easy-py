@@ -17,11 +17,6 @@ class GraderType(Enum):
     TEACHER = "TEACHER"
 
 
-class Token(Enum):
-    ACCESS = "access_token"
-    REFRESH = "refresh_token"
-
-
 # TODO: why do all fields have default values?
 
 @dataclass

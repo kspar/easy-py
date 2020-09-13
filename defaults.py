@@ -3,17 +3,17 @@ import os
 import time
 import typing as T
 
-import data
+import ez
 
 
-def read_token(token_type: data.Token) -> T.Tuple[str, int]:
+def read_token(token_type: ez.Token) -> T.Tuple[str, int]:
     token_file, expires_at = None, 0
 
     if os.path.isfile(token_type.value):
-        if token_type == data.Token.ACCESS:
+        if token_type == ez.Token.ACCESS:
             token_file = json.loads(get_file_content(token_type.value).strip())
             expires_at = token_file["expires_at"]
-        elif token_type == data.Token.REFRESH:
+        elif token_type == ez.Token.REFRESH:
             token_file = get_file_content(token_type.value).strip()
             expires_at = 0
 
@@ -22,12 +22,12 @@ def read_token(token_type: data.Token) -> T.Tuple[str, int]:
 
 def write_tokens(access_token: str, valid_sec: int, refresh_token: str):
     access_token_file = json.dumps({
-        data.Token.ACCESS.value: access_token,
+        ez.Token.ACCESS.value: access_token,
         'expires_at': round(time.time()) + valid_sec
     })
 
-    write_restricted_file(data.Token.ACCESS.value, access_token_file)
-    write_restricted_file(data.Token.REFRESH.value, refresh_token)
+    write_restricted_file(ez.Token.ACCESS.value, access_token_file)
+    write_restricted_file(ez.Token.REFRESH.value, refresh_token)
 
 
 def get_file_content(file_name) -> str:
