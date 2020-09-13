@@ -1,6 +1,7 @@
 import dataclasses
 import logging
 import socket
+import sys
 import threading
 import time
 import typing as T
@@ -92,6 +93,10 @@ class RequestUtil:
 
     def auth(self):
         app = Flask(__name__)
+
+        # Disable Flask banner
+        cli = sys.modules['flask.cli']
+        cli.show_server_banner = lambda *x: None
 
         def shutdown_server():
             func = request.environ.get('werkzeug.server.shutdown')
@@ -250,7 +255,6 @@ class Teacher:
         return self.request_util.simple_get_request(path, data.TeacherCourseResp)
 
 
-# TODO: hide flask banner
 # TODO: hide private fields/methods
 class Ez:
     def __init__(self,
@@ -271,7 +275,7 @@ class Ez:
         if (retrieve_token is None) != (persist_token is None):
             raise ValueError('Both retrieve_token and persist_token must be either defined or None')
 
-        # Used for storing tokens by default
+        # ====== used only when token storage methods are undefined ======
         local_token_store = {}
 
         def in_memory_retrieve_token(token_type):
@@ -279,6 +283,8 @@ class Ez:
 
         def in_memory_persist_token(token_type, token):
             local_token_store[token_type] = token
+
+        # ======
 
         versioned_api_url = util.normalise_url(api_base_url) + API_VERSION_PREFIX
         normalised_idp_url = util.normalise_url(idp_url)
