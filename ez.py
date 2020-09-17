@@ -1,7 +1,6 @@
 import dataclasses
 import logging
 import os
-import socket
 import sys
 import threading
 import time
@@ -12,12 +11,16 @@ from enum import Enum
 
 import requests
 from flask import Flask, request, Response, render_template
+from requests import RequestException
 
 import data
 import util
 from exceptions import AuthRequiredException
 
 API_VERSION_PREFIX = '/v2'
+AUTH_SERVER_HOST = '127.0.0.1'
+AUTH_SERVER_START_POLL_DELAY_SEC = 0.2
+AUTH_SERVER_START_POLL_MAX_RETRIES = 20
 
 
 class TokenType(str, Enum):
@@ -38,8 +41,6 @@ class RequestUtil:
                  idp_url: str,
                  idp_client_name: str,
                  auth_token_min_valid_sec: int,
-                 auth_port_range_first: int,
-                 auth_port_range_last: int,
                  auth_browser_success_msg: str,
                  auth_browser_fail_msg: str,
                  retrieve_token: T.Callable[[TokenType], T.Optional[dict]],
@@ -49,12 +50,13 @@ class RequestUtil:
         self.idp_url = idp_url
         self.idp_client_name = idp_client_name
         self.auth_token_min_valid_sec = auth_token_min_valid_sec
-        self.auth_port_range_first = auth_port_range_first
-        self.auth_port_range_last = auth_port_range_last
         self.auth_browser_success_msg = auth_browser_success_msg
         self.auth_browser_fail_msg = auth_browser_fail_msg
         self.retrieve_token = retrieve_token
         self.persist_token = persist_token
+
+        self.auth_server_port: T.Optional[int] = None
+        self.auth_server_thread: T.Optional[threading.Thread] = None
 
     def simple_get_request(self, path: str, response_dto_class: T.Type[T.Any]) -> T.Any:
         dto = self.get_request(path, {200: response_dto_class})
@@ -125,9 +127,8 @@ class RequestUtil:
             logging.info(f"Refreshing tokens failed with status {r.status_code}")
             return False
 
-    def auth_in_browser(self):
+    def start_auth_in_browser(self):
         app = Flask(__name__, template_folder=os.path.abspath('auth-templates'))
-
         # Disable Flask banner
         cli = sys.modules['flask.cli']
         cli.show_server_banner = lambda *x: None
@@ -138,18 +139,27 @@ class RequestUtil:
                 raise RuntimeError('Not running with the Werkzeug Server')
             func()
 
+        @app.route('/shutdown', methods=['POST'])
+        def controller_shutdown():
+            self.clear_server()
+            shutdown_server()
+            return Response(status=200)
+
         @app.route('/keycloak.json')
         def controller_keycloak_conf():
             return render_template("keycloak.json", idp_url=self.idp_url, client_name=self.idp_client_name)
 
         @app.route('/login')
         def controller_login():
-            return render_template("login.html", idp_url=self.idp_url, port=port,
+            return render_template("login.html", idp_url=self.idp_url, port=self.auth_server_port,
                                    success_msg=self.auth_browser_success_msg, fail_msg=self.auth_browser_fail_msg)
 
         @app.route('/deliver-tokens', methods=['POST'])
         def controller_deliver_tokens():
             try:
+                # Clear server first to decrease the race condition window
+                self.clear_server()
+
                 if request.is_json:
                     body = request.get_json()
                     access_token = StorableToken(TokenType.ACCESS, body["access_token"],
@@ -164,28 +174,48 @@ class RequestUtil:
             finally:
                 shutdown_server()
 
-        host, port = "127.0.0.1", self._get_free_port()
-        url = f'http://{host}:{port}/login'
-        thread = threading.Thread(target=app.run, args=(host, port, False, False,))
+        # Set and start server thread if it's not already running
+        if not self.is_server_active():
+            logging.debug('Auth server not active, starting it')
+            self.auth_server_port = util.get_free_port()
+            self.auth_server_thread = threading.Thread(target=app.run,
+                                                       args=(AUTH_SERVER_HOST, self.auth_server_port, False, False))
+            logging.debug('Starting server thread')
+            self.auth_server_thread.start()
+            logging.debug('Server thread started')
+        else:
+            logging.debug('Auth server already active')
 
-        # Assume the server starts in 2 seconds
-        threading.Timer(2, lambda: webbrowser.open(url)).start()
+        login_url = f'http://{AUTH_SERVER_HOST}:{self.auth_server_port}/login'
 
-        thread.start()
-        thread.join()
-
-    def _get_free_port(self) -> int:
-        for p in range(self.auth_port_range_first, self.auth_port_range_last + 1):
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Wait until server has started
+        for _ in range(AUTH_SERVER_START_POLL_MAX_RETRIES):
+            time.sleep(AUTH_SERVER_START_POLL_DELAY_SEC)
+            logging.debug('Checking if auth server is ready to serve...')
             try:
-                sock.bind(('127.0.0.1', p))
-                sock.close()
-                return p
-            except OSError:
-                # Port already in use?
-                pass
+                status = requests.head(login_url).status_code
+                if status == 200:
+                    logging.debug('Auth server is ready')
+                    break
+                else:
+                    logging.debug(f'Got unexpected status code {status} from auth server')
+            except RequestException:
+                logging.debug('Auth server is not ready yet')
 
-        raise OSError(f"Unable to bind to ports {self.auth_port_range_first} - {self.auth_port_range_last}")
+        else:
+            logging.error('Waiting for the local auth server to start timed out')
+            raise RuntimeError('Waiting for the local auth server to start timed out')
+
+        # And then open browser
+        logging.debug('Opening browser')
+        webbrowser.open(login_url)
+
+    def is_server_active(self) -> bool:
+        return self.auth_server_thread is not None
+
+    def clear_server(self):
+        self.auth_server_thread = None
+        self.auth_server_port = None
 
     def get_stored_token(self, token_type: TokenType) -> T.Optional[StorableToken]:
         token_dict = self.retrieve_token(token_type)
@@ -270,7 +300,6 @@ class Teacher:
 # TODO: hide private fields/methods
 # TODO: should use TokenStorer type/class instead of functions?
 # TODO: add logging and check whether the current levels make sense
-# TODO: what to do when browser-auth has started, the server is running but the browser window was closed by user?
 # TODO: check that argument validation is reasonable for service functions
 class Ez:
     def __init__(self,
@@ -280,8 +309,6 @@ class Ez:
                  retrieve_token: T.Optional[T.Callable[[TokenType], T.Optional[dict]]] = None,
                  persist_token: T.Optional[T.Callable[[TokenType, dict], None]] = None,
                  auth_token_min_valid_sec: int = 20,
-                 auth_port_range_first: int = 5100,
-                 auth_port_range_last: int = 5109,
                  auth_browser_success_msg: str = "Authentication was successful! You can now close this page.",
                  auth_browser_fail_msg: str = "Something failed... did you try turning it off and on again?",
                  logging_level: int = logging.INFO):
@@ -308,7 +335,7 @@ class Ez:
         normalised_idp_url = util.normalise_url(idp_url)
 
         self.util = RequestUtil(versioned_api_url, normalised_idp_url, idp_client_name,
-                                auth_token_min_valid_sec, auth_port_range_first, auth_port_range_last,
+                                auth_token_min_valid_sec,
                                 auth_browser_success_msg.strip().replace('\n', ''),
                                 auth_browser_fail_msg.strip().replace('\n', ''),
                                 retrieve_token if retrieve_token is not None else in_memory_retrieve_token,
@@ -318,8 +345,16 @@ class Ez:
 
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s : %(message)s', level=logging_level)
 
-    def auth_in_browser(self):
-        self.util.auth_in_browser()
+    def start_auth_in_browser(self):
+        self.util.start_auth_in_browser()
+
+    def is_auth_in_progress(self, timeout_sec: int = 0) -> bool:
+        thread = self.util.auth_server_thread
+        if thread is None:
+            return False
+        else:
+            thread.join(timeout_sec)
+            return thread.is_alive()
 
     def is_auth_required(self) -> bool:
         try:
@@ -327,3 +362,18 @@ class Ez:
             return False
         except AuthRequiredException:
             return True
+
+    def shutdown(self):
+        # Best effort stop server if running
+        host, port, thread = AUTH_SERVER_HOST, self.util.auth_server_port, self.util.auth_server_thread
+        if port is not None and thread is not None:
+            logging.debug('Auth server seems to be running, attempting to shut down')
+            shutdown_url = f'http://{host}:{port}/shutdown'
+            try:
+                status = requests.post(shutdown_url, timeout=2).status_code
+                if status == 200:
+                    logging.debug('Auth server shutdown seems to have worked')
+                else:
+                    logging.debug(f'Got unexpected status {status} when trying to shut down auth server')
+            except Exception as e:
+                logging.warning(f'Got exception {repr(e)}')

@@ -1,6 +1,6 @@
 import json
 import typing as T
-
+import socket
 import requests
 
 from data import Resp
@@ -14,6 +14,12 @@ def contains_none(args) -> bool:
 def assert_not_none(*args):
     if contains_none(args):
         raise ValueError("None arguments are not allowed in this function call.")
+
+
+def get_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(('127.0.0.1', 0))
+        return sock.getsockname()[1]
 
 
 def handle_response(resp: requests.Response, code_to_dto_class: T.Dict[int, T.Type[T.Any]]) -> Resp:
