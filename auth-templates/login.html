@@ -14,7 +14,10 @@
 
     kc = Keycloak("http://127.0.0.1:{{ port }}/keycloak.json");
     kc.init({
-        onLoad: 'login-required'
+        onLoad: 'login-required',
+        checkLoginIframe: false,
+        enableLogging: true,
+        pkceMethod: 'S256'
 
     }).success((authenticated) => {
         console.debug("Authenticated: " + authenticated);
