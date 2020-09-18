@@ -17,6 +17,12 @@ class GraderType(Enum):
     TEACHER = "TEACHER"
 
 
+class ExerciseStatus(Enum):
+    UNSTARTED = "UNSTARTED"
+    STARTED = "STARTED"
+    COMPLETED = "COMPLETED"
+
+
 # TODO: why do all fields have default values?
 
 @dataclass
@@ -38,6 +44,22 @@ class ExerciseDetailsResp(Resp):
     grader_type: GraderType = None,
     threshold: int = None,
     instructions_html: str = None
+
+
+@dataclass
+class StudentExercise:
+    id: str = None,
+    effective_title: str = None
+    deadline: str = None
+    status: ExerciseStatus = None
+    grade: int = None
+    graded_by: GraderType = None
+    ordering_idx: int = None
+
+
+@dataclass
+class StudentExerciseResp(Resp):
+    exercises: T.List[StudentExercise] = None
 
 
 @dataclass

@@ -242,7 +242,16 @@ class Student:
         path = "/student/courses"
         return self.request_util.simple_get_request(path, data.StudentCourseResp)
 
-    def get_exercise_details(self, course_id: str, course_exercise_id: str) -> data.ExerciseDetailsResp:
+    def get_course_exercises(self, course_id: str) -> data.StudentExerciseResp:
+        """
+        GER summaries of exercises on this course.
+        """
+        util.assert_not_none(course_id)
+        logging.debug(f"GER summaries of exercises on this course.")
+        path = f"/student/courses/{course_id}/exercises"
+        return self.request_util.simple_get_request(path, data.StudentExerciseResp)
+
+    def get_exercise_details(self, course_id: str, course_exercise_id: str) -> data.StudentExerciseResp:
         """
         GET the specified course exercise details.
         """
