@@ -2,7 +2,7 @@ import json
 import os
 import typing as T
 
-import ez
+from easy import ez
 
 
 def gen_read_token_from_file(storage_path_provider: T.Callable[[ez.TokenType], str],

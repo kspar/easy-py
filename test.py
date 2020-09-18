@@ -1,9 +1,7 @@
 import logging
 import typing as T
 
-import ez as e
-from defaults import gen_read_token_from_file, gen_write_token_to_file
-import time
+from easy import ez as e
 
 
 def get_student_testing_header() -> T.Dict[str, str]:

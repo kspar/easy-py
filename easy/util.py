@@ -1,10 +1,11 @@
 import json
-import typing as T
 import socket
+import typing as T
+
 import requests
 
-from data import Resp
-from exceptions import ErrorResponseException, ErrorResp
+from .data import Resp
+from .exceptions import ErrorResponseException, ErrorResp
 
 
 def contains_none(args) -> bool:

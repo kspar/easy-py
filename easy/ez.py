@@ -1,6 +1,6 @@
 import dataclasses
 import logging
-import os
+import pathlib
 import sys
 import threading
 import time
@@ -13,9 +13,8 @@ import requests
 from flask import Flask, request, Response, render_template
 from requests import RequestException
 
-import data
-import util
-from exceptions import AuthRequiredException
+from . import data, util
+from .exceptions import AuthRequiredException
 
 API_VERSION_PREFIX = '/v2'
 AUTH_SERVER_HOST = '127.0.0.1'
@@ -63,6 +62,7 @@ class RequestUtil:
         assert isinstance(dto, response_dto_class)
         return dto
 
+    # TODO: refactor to a single underlying request method?
     def get_request(self, path: str, resp_code_to_dto_class: T.Dict[int, T.Type[T.Any]]) -> T.Any:
         resp: requests.Response = requests.get(self.api_url + path, headers=self.get_token_header())
         if resp.status_code == 401:
@@ -128,7 +128,8 @@ class RequestUtil:
             return False
 
     def start_auth_in_browser(self):
-        app = Flask(__name__, template_folder=os.path.abspath('auth-templates'))
+        templates_path = str((pathlib.Path(__file__).parent / 'auth-templates').resolve())
+        app = Flask(__name__, template_folder=templates_path)
         # Disable Flask banner
         cli = sys.modules['flask.cli']
         cli.show_server_banner = lambda *x: None
