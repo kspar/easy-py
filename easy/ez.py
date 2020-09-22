@@ -251,7 +251,7 @@ class Student:
         path = f"/student/courses/{course_id}/exercises"
         return self.request_util.simple_get_request(path, data.StudentExerciseResp)
 
-    def get_exercise_details(self, course_id: str, course_exercise_id: str) -> data.StudentExerciseResp:
+    def get_exercise_details(self, course_id: str, course_exercise_id: str) -> data.ExerciseDetailsResp:
         """
         GET the specified course exercise details.
         """
