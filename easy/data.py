@@ -27,7 +27,7 @@ class ExerciseStatus(Enum):
 
 @dataclass
 class Resp:
-    resp_code: int = None,
+    resp_code: int = None
     response: requests.Response = None
 
 
@@ -38,17 +38,17 @@ class EmptyResp(Resp):
 
 @dataclass
 class ExerciseDetailsResp(Resp):
-    effective_title: str = None,
-    text_html: str = None,
-    deadline: str = None,
-    grader_type: GraderType = None,
-    threshold: int = None,
+    effective_title: str = None
+    text_html: str = None
+    deadline: str = None
+    grader_type: GraderType = None
+    threshold: int = None
     instructions_html: str = None
 
 
 @dataclass
 class StudentExercise:
-    id: str = None,
+    id: str = None
     effective_title: str = None
     deadline: str = None
     status: ExerciseStatus = None
@@ -64,7 +64,7 @@ class StudentExerciseResp(Resp):
 
 @dataclass
 class StudentCourse:
-    id: str = None,
+    id: str = None
     title: str = None
 
 
@@ -75,7 +75,7 @@ class StudentCourseResp(Resp):
 
 @dataclass
 class SubmissionResp(Resp):
-    id: str = None,
+    id: str = None
     solution: str = None
     submission_time: str = None
     autograde_status: AutogradeStatus = None
@@ -87,14 +87,14 @@ class SubmissionResp(Resp):
 
 @dataclass
 class StudentAllSubmissionsResp(Resp):
-    submissions: T.List[SubmissionResp] = None,
+    submissions: T.List[SubmissionResp] = None
     count: int = None
 
 
 @dataclass
 class TeacherCourse:
-    id: str = None,
-    title: str = None,
+    id: str = None
+    title: str = None
     student_count: int = None
 
 
