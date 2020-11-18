@@ -20,6 +20,7 @@ API_VERSION_PREFIX = '/v2'
 AUTH_SERVER_HOST = '127.0.0.1'
 AUTH_SERVER_START_POLL_DELAY_SEC = 0.2
 AUTH_SERVER_START_POLL_MAX_RETRIES = 20
+TIMEOUT = 35
 
 
 class TokenType(str, Enum):
@@ -64,7 +65,7 @@ class RequestUtil:
 
     # TODO: refactor to a single underlying request method?
     def get_request(self, path: str, resp_code_to_dto_class: T.Dict[int, T.Type[T.Any]]) -> T.Any:
-        resp: requests.Response = requests.get(self.api_url + path, headers=self.get_token_header())
+        resp: requests.Response = requests.get(self.api_url + path, headers=self.get_token_header(), timeout=TIMEOUT)
         if resp.status_code == 401:
             raise AuthRequiredException()
         dto = util.handle_response(resp, resp_code_to_dto_class)
@@ -74,7 +75,7 @@ class RequestUtil:
                      resp_code_to_dto_class: T.Dict[int, T.Type[T.Any]]) -> T.Any:
         req_body_dict = dataclasses.asdict(request_dto_dataclass)
         resp: requests.Response = requests.post(self.api_url + path, json=req_body_dict,
-                                                headers=self.get_token_header())
+                                                headers=self.get_token_header(), timeout=TIMEOUT)
         if resp.status_code == 401:
             raise AuthRequiredException()
         dto = util.handle_response(resp, resp_code_to_dto_class)
@@ -110,7 +111,8 @@ class RequestUtil:
             'client_id': self.idp_client_name
         }
 
-        r = requests.post(f"{self.idp_url}/auth/realms/master/protocol/openid-connect/token", data=token_req_body)
+        r = requests.post(f"{self.idp_url}/auth/realms/master/protocol/openid-connect/token", data=token_req_body,
+                          timeout=TIMEOUT)
 
         if r.status_code == 200:
             body = r.json()
