@@ -1,4 +1,6 @@
+import base64
 import dataclasses
+import json
 import logging
 import pathlib
 import sys
@@ -232,8 +234,7 @@ class RequestUtil:
 
 
 class Student:
-    def __init__(self,
-                 request_util: RequestUtil):
+    def __init__(self, request_util: RequestUtil):
         self.request_util = request_util
 
     def get_courses(self) -> data.StudentCourseResp:
@@ -356,6 +357,27 @@ class Ez:
         self.teacher: Teacher = Teacher(self.util)
 
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s : %(message)s', level=logging_level)
+
+    def check_in(self) -> int:
+
+        """
+        POST check-in.
+        """
+        logging.debug("POST check-in")
+        # https://stackoverflow.com/questions/38683439/how-to-decode-base64-in-python3
+        b64_string = self.util.get_valid_access_token().token.split(".")[1]
+        b64_string += "=" * ((4 - len(b64_string) % 4) % 4)
+        d = json.loads(base64.b64decode(b64_string))
+
+        @dataclass
+        class Account:
+            first_name: str
+            last_name: str
+
+        self.util.get_valid_access_token()
+
+        path = f"/account/checkin"
+        return self.util.post_request(path, Account(d["given_name"], d["family_name"]), {200: data.EmptyResp})
 
     def start_auth_in_browser(self):
         self.util.start_auth_in_browser()

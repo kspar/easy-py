@@ -35,6 +35,7 @@ def main(ez: e.Ez):
         print(ez.is_auth_required())
         # print(ez.is_auth_in_progress(100))
 
+    print(ez.check_in())
     print(ez.student.get_courses())
     # print(ez.student.post_submission('7', '181', 'print("ez!")'))
     # print(ez.student.get_exercise_details("2", "1"))
