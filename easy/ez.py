@@ -389,3 +389,7 @@ class Ez:
                     logging.debug(f'Got unexpected status {status} when trying to shut down auth server')
             except Exception as e:
                 logging.warning(f'Got exception {repr(e)}')
+
+    def logout_in_browser(self):
+        url = f"/auth/realms/master/protocol/openid-connect/logout?redirect_uri=https%3A%2F%2F"
+        webbrowser.open(self.util.idp_url + url + self.util.idp_client_name)
