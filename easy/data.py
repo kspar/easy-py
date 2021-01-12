@@ -47,7 +47,7 @@ class ExerciseDetailsResp(Resp):
 
 
 @dataclass
-class StudentExercise:
+class StudentExercise(Resp):
     id: str = None
     effective_title: str = None
     deadline: str = None
@@ -63,7 +63,7 @@ class StudentExerciseResp(Resp):
 
 
 @dataclass
-class StudentCourse:
+class StudentCourse(Resp):
     id: str = None
     title: str = None
 
@@ -92,7 +92,7 @@ class StudentAllSubmissionsResp(Resp):
 
 
 @dataclass
-class TeacherCourse:
+class TeacherCourse(Resp):
     id: str = None
     title: str = None
     student_count: int = None
@@ -101,3 +101,8 @@ class TeacherCourse:
 @dataclass
 class TeacherCourseResp(Resp):
     courses: T.List[TeacherCourse] = None
+
+
+@dataclass
+class BasicCourseInfoResp(Resp):
+    title: str = None

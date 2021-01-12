@@ -233,6 +233,19 @@ class RequestUtil:
         self.persist_token(token_type, dataclasses.asdict(token))
 
 
+class Common:
+    def __init__(self, request_util: RequestUtil):
+        self.request_util = request_util
+
+    def get_course_basic_info(self, course_id: str) -> data.BasicCourseInfoResp:
+        """
+        Get basic info about this course.
+        """
+        logging.debug(f"GET basic info about this course.")
+        path = f"/courses/{course_id}/basic"
+        return self.request_util.simple_get_request(path, data.BasicCourseInfoResp)
+
+
 class Student:
     def __init__(self, request_util: RequestUtil):
         self.request_util = request_util
@@ -355,6 +368,7 @@ class Ez:
                                 persist_token if persist_token is not None else in_memory_persist_token)
         self.student: Student = Student(self.util)
         self.teacher: Teacher = Teacher(self.util)
+        self.common: Common = Common(self.util)
 
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s : %(message)s', level=logging_level)
 
