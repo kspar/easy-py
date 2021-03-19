@@ -1,6 +1,4 @@
-import base64
 import dataclasses
-import json
 import logging
 import pathlib
 import sys
@@ -17,6 +15,7 @@ from requests import RequestException
 
 from . import data, util
 from .exceptions import AuthRequiredException
+from .util import decode_token
 
 API_VERSION_PREFIX = '/v2'
 AUTH_SERVER_HOST = '127.0.0.1'
@@ -378,10 +377,7 @@ class Ez:
         POST check-in.
         """
         logging.debug("POST check-in")
-        # https://stackoverflow.com/questions/38683439/how-to-decode-base64-in-python3
-        b64_string = self.util.get_valid_access_token().token.split(".")[1]
-        b64_string += "=" * ((4 - len(b64_string) % 4) % 4)
-        d = json.loads(base64.b64decode(b64_string))
+        d = decode_token(self.util.get_valid_access_token().token)
 
         @dataclass
         class Account:

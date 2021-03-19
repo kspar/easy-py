@@ -1,3 +1,4 @@
+import base64
 import json
 import socket
 import typing as T
@@ -54,3 +55,10 @@ def normalise_url(url: str) -> str:
     if not norm_url.startswith('http'):
         norm_url = 'https://' + norm_url
     return norm_url.rstrip('/')
+
+
+def decode_token(token: str):
+    # https://stackoverflow.com/questions/38683439/how-to-decode-base64-in-python3
+    b64_string = token.split(".")[1]
+    b64_string += "=" * ((4 - len(b64_string) % 4) % 4)
+    return json.loads(base64.b64decode(b64_string))
