@@ -97,7 +97,7 @@ class RequestUtil:
         return access_token
 
     def access_token_is_valid(self, access_token: T.Optional[StorableToken]):
-        return access_token is not None and time.time() <= access_token.expires_at + self.auth_token_min_valid_sec
+        return access_token is not None and time.time() <= access_token.expires_at - self.auth_token_min_valid_sec
 
     def _refresh_using_refresh_token(self) -> bool:
         refresh_token = self.get_stored_token(TokenType.REFRESH)
