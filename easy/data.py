@@ -23,6 +23,12 @@ class ExerciseStatus(Enum):
     COMPLETED = "COMPLETED"
 
 
+class ParticipantRole(Enum):
+    STUDENT = "student"
+    TEACHER = "teacher"
+    ALL = "all"
+
+
 # TODO: why do all fields have default values?
 
 @dataclass
@@ -106,3 +112,94 @@ class TeacherCourseResp(Resp):
 @dataclass
 class BasicCourseInfoResp(Resp):
     title: str = None
+
+
+@dataclass
+class CourseGroup:
+    id: str
+    name: str
+
+
+@dataclass
+class CourseParticipantsStudent:
+    id: str
+    email: str
+    given_name: str
+    family_name: str
+    created_at: str
+    groups: T.List[CourseGroup]
+    moodle_username: str
+
+
+@dataclass
+class CourseParticipantsTeacher:
+    id: str
+    email: str
+    given_name: str
+    family_name: str
+    created_at: str
+    groups: T.List[CourseGroup]
+
+
+@dataclass
+class CourseParticipantsStudentPending:
+    email: str
+    valid_from: str
+    groups: T.List[CourseGroup]
+
+
+@dataclass
+class CourseParticipantsStudentPendingMoodle:
+    ut_username: str
+    groups: T.List[CourseGroup]
+
+
+@dataclass
+class TeacherCourseParticipantsResp(Resp):
+    moodle_short_name: str = None
+    moodle_students_synced: bool = None
+    moodle_grades_synced: bool = None
+    student_count: int = None
+    teacher_count: int = None
+    students_pending_count: int = None
+    students_moodle_pending_count: int = None
+    students: T.List[CourseParticipantsStudent] = None
+    teachers: T.List[CourseParticipantsTeacher] = None
+    students_pending: T.List[CourseParticipantsStudentPending] = None
+    students_moodle_pending: T.List[CourseParticipantsStudentPendingMoodle] = None
+
+
+@dataclass
+class TeacherCourseExercises:
+    id: str
+    effective_title: str
+    soft_deadline: str
+    grader_type: GraderType
+    ordering_idx: int
+    unstarted_count: int
+    ungraded_count: int
+    started_count: int
+    completed_count: int
+
+
+@dataclass
+class TeacherCourseExercisesResp(Resp):
+    exercises: T.List[TeacherCourseExercises] = None
+
+
+@dataclass
+class TeacherCourseExerciseSubmissionsStudent:
+    id: str
+    solution: str
+    created_at: str
+    grade_auto: int
+    feedback_auto: str
+    grade_teacher: int
+    feedback_teacher: str
+
+
+@dataclass
+class TeacherCourseExerciseSubmissionsStudentResp(Resp):
+    submissions: T.List[TeacherCourseExerciseSubmissionsStudent] = None
+    count: int = None
+

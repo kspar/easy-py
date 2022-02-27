@@ -321,6 +321,35 @@ class Teacher:
         path = "/teacher/courses"
         return self.request_util.simple_get_request(path, data.TeacherCourseResp)
 
+    def get_course_participants(self, course_id: str, role: data.ParticipantRole = data.ParticipantRole.ALL,
+                                limit: int = 1_000_000, offset: int = 0) -> data.TeacherCourseParticipantsResp:
+        """
+        TODO
+        """
+        logging.debug(f"Get participants on course {course_id} with role {role} (offset: {offset}, limit: {limit})")
+        path = f"/courses/{course_id}/participants?role={role.value}&offset={offset}&limit={limit}"
+        return self.request_util.simple_get_request(path, data.TeacherCourseParticipantsResp)
+
+    def get_course_exercises(self, course_id: str) -> data.TeacherCourseExercisesResp:
+        """
+        TODO
+        """
+        logging.debug(f"Get teacher exercises on course {course_id}")
+        path = f"/teacher/courses/{course_id}/exercises"
+        return self.request_util.simple_get_request(path, data.TeacherCourseExercisesResp)
+
+    def get_course_exercise_submissions_student(self, course_id: str, course_exercise_id: str, student_id: str,
+                                                limit: int = 1_000_000,
+                                                offset: int = 0) -> data.TeacherCourseExerciseSubmissionsStudentResp:
+        """
+        TODO
+        """
+        logging.debug(f"Get submissions to course exercise {course_exercise_id} on course {course_id} by "
+                      f"student {student_id} (offset: {offset}, limit: {limit})")
+        path = f"/teacher/courses/{course_id}/exercises/{course_exercise_id}/submissions/all/students/{student_id}" \
+               f"?offset={offset}&limit={limit}"
+        return self.request_util.simple_get_request(path, data.TeacherCourseExerciseSubmissionsStudentResp)
+
 
 # TODO: hide private fields/methods
 # TODO: should use TokenStorer type/class instead of functions?

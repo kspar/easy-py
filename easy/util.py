@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import socket
 import typing as T
 
@@ -34,6 +35,8 @@ def handle_response(resp: requests.Response, code_to_dto_class: T.Dict[int, T.Ty
         except json.decoder.JSONDecodeError as e:
             # Not valid JSON
             raise ErrorResponseException(resp, None, e)
+
+    logging.debug(f"JSON response: {json_response}")
 
     if resp.status_code in code_to_dto_class:
         response_dto_class = code_to_dto_class[resp.status_code]
