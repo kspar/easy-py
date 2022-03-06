@@ -45,7 +45,7 @@ class RequestUtil:
                  auth_browser_success_msg: str,
                  auth_browser_fail_msg: str,
                  retrieve_token: T.Callable[[TokenType], T.Optional[dict]],
-                 persist_token: T.Callable[[TokenType, dict], None]):
+                 persist_token: T.Callable[[TokenType, T.Optional[dict]], None]):
 
         self.api_url = api_url
         self.idp_url = idp_url
@@ -104,6 +104,10 @@ class RequestUtil:
 
         if refresh_token is None:
             logging.debug("No refresh token found")
+            return False
+
+        if time.time() > refresh_token.expires_at - self.auth_token_min_valid_sec:
+            logging.debug("Refresh token expired")
             return False
 
         token_req_body = {
@@ -228,8 +232,8 @@ class RequestUtil:
         if token_dict is not None:
             return StorableToken(**token_dict)
 
-    def set_stored_token(self, token_type: TokenType, token: StorableToken):
-        self.persist_token(token_type, dataclasses.asdict(token))
+    def set_stored_token(self, token_type: TokenType, token: T.Optional[StorableToken]):
+        self.persist_token(token_type, None if token is None else dataclasses.asdict(token))
 
 
 class Common:
@@ -381,7 +385,10 @@ class Ez:
             return local_token_store[token_type] if token_type in local_token_store else None
 
         def in_memory_persist_token(token_type, token):
-            local_token_store[token_type] = token
+            if token is None:
+                local_token_store.pop(token_type, None)
+            else:
+                local_token_store[token_type] = token
 
         # ======
 
@@ -452,5 +459,9 @@ class Ez:
                 logging.warning(f'Got exception {repr(e)}')
 
     def logout_in_browser(self):
-        url = f"/auth/realms/master/protocol/openid-connect/logout?redirect_uri=https%3A%2F%2F"
-        webbrowser.open(self.util.idp_url + url + self.util.idp_client_name)
+        self.util.set_stored_token(TokenType.ACCESS, None)
+        self.util.set_stored_token(TokenType.REFRESH, None)
+        webbrowser.open(
+            f"{self.util.idp_url}/auth/realms/master/protocol/openid-connect/logout"
+            f"?redirect_uri=https%3A%2F%2F{self.util.idp_client_name}"
+        )

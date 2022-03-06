@@ -21,11 +21,15 @@ def gen_read_token_from_file(storage_path_provider: T.Callable[[ez.TokenType], s
 
 def gen_write_token_to_file(storage_path_provider: T.Callable[[ez.TokenType], str],
                             namer: T.Callable[[ez.TokenType], str]):
-    def write_token_to_file(token_type: ez.TokenType, token: dict):
+    def write_token_to_file(token_type: ez.TokenType, token: T.Optional[dict]):
         containing_dir = storage_path_provider(token_type)
         os.makedirs(containing_dir, exist_ok=True)
         path = os.path.join(containing_dir, namer(token_type))
-        write_restricted_file(path, json.dumps(token, sort_keys=True, indent=2))
+        if token is None:
+            if os.path.isfile(path):
+                os.remove(path)
+        else:
+            write_restricted_file(path, json.dumps(token, sort_keys=True, indent=2))
 
     return write_token_to_file
 
