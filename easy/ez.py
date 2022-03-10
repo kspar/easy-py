@@ -428,13 +428,17 @@ class Ez:
     def start_auth_in_browser(self):
         self.util.start_auth_in_browser()
 
-    def is_auth_in_progress(self, timeout_sec: int = 0) -> bool:
+    def is_auth_in_progress(self, timeout_sec: T.Optional[int] = 0) -> bool:
         thread = self.util.auth_server_thread
         if thread is None:
             return False
         else:
             thread.join(timeout_sec)
             return thread.is_alive()
+
+    def await_is_auth_completed(self, timeout_sec: T.Optional[int] = None) -> bool:
+        self.is_auth_in_progress(timeout_sec)
+        return not self.is_auth_required()
 
     def is_auth_required(self) -> bool:
         try:
