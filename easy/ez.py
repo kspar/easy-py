@@ -1,6 +1,10 @@
+import atexit
 import dataclasses
 import logging
+import multiprocessing
+import os
 import pathlib
+import signal
 import sys
 import threading
 import time
@@ -8,10 +12,12 @@ import typing as T
 import webbrowser
 from dataclasses import dataclass
 from enum import Enum
+from queue import Empty
 
 import requests
 from flask import Flask, request, Response, render_template
 from requests import RequestException
+from werkzeug import Response
 
 from . import data, util
 from .exceptions import AuthRequiredException
@@ -57,7 +63,6 @@ class RequestUtil:
         self.persist_token = persist_token
 
         self.auth_server_port: T.Optional[int] = None
-        self.auth_server_thread: T.Optional[threading.Thread] = None
 
     def simple_get_request(self, path: str, response_dto_class: T.Type[T.Any]) -> T.Any:
         dto = self.get_request(path, {200: response_dto_class})
@@ -134,24 +139,12 @@ class RequestUtil:
             logging.info(f"Refreshing tokens failed with status {r.status_code}")
             return False
 
-    def start_auth_in_browser(self):
+    def start_auth_in_browser(self, q):
         templates_path = str((pathlib.Path(__file__).parent / 'auth-templates').resolve())
         app = Flask(__name__, template_folder=templates_path)
         # Disable Flask banner
         cli = sys.modules['flask.cli']
         cli.show_server_banner = lambda *x: None
-
-        def shutdown_server():
-            func = request.environ.get('werkzeug.server.shutdown')
-            if func is None:
-                raise RuntimeError('Not running with the Werkzeug Server')
-            func()
-
-        @app.route('/shutdown', methods=['POST'])
-        def controller_shutdown():
-            self.clear_server()
-            shutdown_server()
-            return Response(status=200)
 
         @app.route('/keycloak.json')
         def controller_keycloak_conf():
@@ -164,35 +157,25 @@ class RequestUtil:
 
         @app.route('/deliver-tokens', methods=['POST'])
         def controller_deliver_tokens():
-            try:
-                # Clear server first to decrease the race condition window
-                self.clear_server()
 
-                if request.is_json:
-                    body = request.get_json()
-                    access_token = StorableToken(TokenType.ACCESS, body["access_token"],
-                                                 round(time.time()) + int(body['access_token_valid_sec']))
-                    refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
-                                                  round(time.time()) + int(body['refresh_token_valid_sec']))
-                    self.set_stored_token(TokenType.ACCESS, access_token)
-                    self.set_stored_token(TokenType.REFRESH, refresh_token)
-                    return Response(status=200)
-                else:
-                    return Response(status=400)
-            finally:
-                shutdown_server()
+            if request.is_json:
+                body = request.get_json(cache=False)  # Set cache = F as otherwise q is not updated...
+                access_token = StorableToken(TokenType.ACCESS, body["access_token"],
+                                             round(time.time()) + int(body['access_token_valid_sec']))
+                refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
+                                              round(time.time()) + int(body['refresh_token_valid_sec']))
 
-        # Set and start server thread if it's not already running
-        if not self.is_server_active():
-            logging.debug('Auth server not active, starting it')
-            self.auth_server_port = util.get_free_port()
-            self.auth_server_thread = threading.Thread(target=app.run,
-                                                       args=(AUTH_SERVER_HOST, self.auth_server_port, False, False))
-            logging.debug('Starting server thread')
-            self.auth_server_thread.start()
-            logging.debug('Server thread started')
-        else:
-            logging.debug('Auth server already active')
+                q.put((access_token, refresh_token))
+
+                return Response(status=200)
+            else:
+                return Response(status=400)
+
+        # Start server thread.
+        logging.debug('Auth server not active, starting it')
+        self.auth_server_port = util.get_free_port()
+        threading.Thread(target=app.run, args=(AUTH_SERVER_HOST, self.auth_server_port, False, False)).start()
+        logging.debug('Server thread started')
 
         login_url = f'http://{AUTH_SERVER_HOST}:{self.auth_server_port}/login'
 
@@ -217,13 +200,6 @@ class RequestUtil:
         # And then open browser
         logging.debug('Opening browser')
         webbrowser.open(login_url)
-
-    def is_server_active(self) -> bool:
-        return self.auth_server_thread is not None
-
-    def clear_server(self):
-        self.auth_server_thread = None
-        self.auth_server_port = None
 
     def get_stored_token(self, token_type: TokenType) -> T.Optional[StorableToken]:
         token_dict = self.retrieve_token(token_type)
@@ -360,6 +336,16 @@ class Teacher:
 # TODO: add logging and check whether the current levels make sense
 # TODO: check that argument validation is reasonable for service functions
 class Ez:
+
+    def exit_handle_auth_processes(self):
+        """
+        If main is killed, the started authentication processes become orphans. This function kills all processes that
+        were started, but not finished.
+        """
+        logging.debug(f"Application exit found, killing subprocesses: {self.started_auth_process_pid}")
+        [os.kill(pid, signal.SIGTERM) for pid in self.started_auth_process_pid]
+        logging.debug("Subprocesses killed")
+
     def __init__(self,
                  api_base_url: str,
                  idp_url: str,
@@ -378,18 +364,15 @@ class Ez:
         if (retrieve_token is None) != (persist_token is None):
             raise ValueError('Both retrieve_token and persist_token must be either defined or None')
 
+        # Authentication creates one or more subprocesses. Keep track, which are left running after system exit.
+        self.started_auth_process_pid = set()
+        # Lock for authentication
+        self.lock = multiprocessing.RLock()
+        # Kill created subprocesses on exit.
+        atexit.register(self.exit_handle_auth_processes)
+
         # ====== used only when token storage methods are undefined ======
-        local_token_store = {}
-
-        def in_memory_retrieve_token(token_type):
-            return local_token_store[token_type] if token_type in local_token_store else None
-
-        def in_memory_persist_token(token_type, token):
-            if token is None:
-                local_token_store.pop(token_type, None)
-            else:
-                local_token_store[token_type] = token
-
+        self.local_token_store = {}
         # ======
 
         versioned_api_url = util.normalise_url(api_base_url) + API_VERSION_PREFIX
@@ -399,14 +382,27 @@ class Ez:
                                 auth_token_min_valid_sec,
                                 auth_browser_success_msg.strip().replace('\n', ''),
                                 auth_browser_fail_msg.strip().replace('\n', ''),
-                                retrieve_token if retrieve_token is not None else in_memory_retrieve_token,
-                                persist_token if persist_token is not None else in_memory_persist_token)
+                                retrieve_token if retrieve_token is not None else self.in_memory_retrieve_token,
+                                persist_token if persist_token is not None else self.in_memory_persist_token)
         self.student: Student = Student(self.util)
         self.teacher: Teacher = Teacher(self.util)
         self.common: Common = Common(self.util)
 
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s : %(message)s', level=logging_level)
 
+    # ====== used only when token storage methods are undefined ======
+    def in_memory_retrieve_token(self, token_type):
+        with self.lock:
+            return self.local_token_store[token_type] if token_type in self.local_token_store else None
+
+    def in_memory_persist_token(self, token_type, token):
+        with self.lock:
+            if token is None:
+                self.local_token_store.pop(token_type, None)
+            else:
+                self.local_token_store[token_type] = token
+
+    # ======
     def check_in(self) -> int:
 
         """
@@ -425,20 +421,29 @@ class Ez:
         path = f"/account/checkin"
         return self.util.post_request(path, Account(d["given_name"], d["family_name"]), {200: data.EmptyResp})
 
-    def start_auth_in_browser(self):
-        self.util.start_auth_in_browser()
+    def auth_in_browser(self, timeout_sec: int):
+        # Do not start it before the last execution is finished. Probably not needed.
+        with self.lock:
+            token_queue = multiprocessing.Queue()
+            auth_process = multiprocessing.Process(target=self.util.start_auth_in_browser, args=(token_queue,))
+            auth_process.start()
+            self.started_auth_process_pid.add(auth_process.pid)
+            logging.debug(f"Auth process started: {auth_process}")
 
-    def is_auth_in_progress(self, timeout_sec: T.Optional[int] = 0) -> bool:
-        thread = self.util.auth_server_thread
-        if thread is None:
-            return False
-        else:
-            thread.join(timeout_sec)
-            return thread.is_alive()
+            try:
+                access_token, refresh_token = token_queue.get(block=True, timeout=timeout_sec)
+            except Empty:
+                logging.info(f"Authentication not finished in {timeout_sec} seconds")
+            except KeyboardInterrupt:
+                logging.debug("KeyboardInterrupt detected, cancelling token receiving.")
+            else:
+                self.util.set_stored_token(TokenType.ACCESS, access_token)
+                self.util.set_stored_token(TokenType.REFRESH, refresh_token)
 
-    def await_is_auth_completed(self, timeout_sec: T.Optional[int] = None) -> bool:
-        self.is_auth_in_progress(timeout_sec)
-        return not self.is_auth_required()
+            auth_process.terminate()
+            auth_process.join()
+            self.started_auth_process_pid.remove(auth_process.pid)
+            logging.debug(f"Auth process finished: {auth_process}")
 
     def is_auth_required(self) -> bool:
         try:
@@ -446,21 +451,6 @@ class Ez:
             return False
         except AuthRequiredException:
             return True
-
-    def shutdown(self):
-        # Best effort stop server if running
-        host, port, thread = AUTH_SERVER_HOST, self.util.auth_server_port, self.util.auth_server_thread
-        if port is not None and thread is not None:
-            logging.debug('Auth server seems to be running, attempting to shut down')
-            shutdown_url = f'http://{host}:{port}/shutdown'
-            try:
-                status = requests.post(shutdown_url, timeout=2).status_code
-                if status == 200:
-                    logging.debug('Auth server shutdown seems to have worked')
-                else:
-                    logging.debug(f'Got unexpected status {status} when trying to shut down auth server')
-            except Exception as e:
-                logging.warning(f'Got exception {repr(e)}')
 
     def logout_in_browser(self):
         self.util.set_stored_token(TokenType.ACCESS, None)

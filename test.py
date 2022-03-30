@@ -25,11 +25,9 @@ def get_teacher_testing_header() -> T.Dict[str, str]:
 def main(ez: e.Ez):
     if ez.is_auth_required():
         print('auth is required')
-        ez.start_auth_in_browser()
-        print('auth started')
-        while ez.is_auth_in_progress(10):
-            print('Still not done')
-            ez.start_auth_in_browser()
+        print('authenticating')
+        while ez.is_auth_required():
+            ez.auth_in_browser(10)
 
         print('Done!')
         print(ez.is_auth_required())
@@ -61,7 +59,4 @@ if __name__ == '__main__':
               auth_browser_success_msg=success_msg,
               logging_level=logging.DEBUG)
 
-    try:
-        main(ez)
-    finally:
-        ez.shutdown()
+    main(ez)
