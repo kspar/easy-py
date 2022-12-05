@@ -72,6 +72,7 @@ class StudentExerciseResp(Resp):
 class StudentCourse(Resp):
     id: str = None
     title: str = None
+    alias: str = None
 
 
 @dataclass
@@ -101,6 +102,7 @@ class StudentAllSubmissionsResp(Resp):
 class TeacherCourse(Resp):
     id: str = None
     title: str = None
+    alias: str = None
     student_count: int = None
 
 
@@ -112,6 +114,7 @@ class TeacherCourseResp(Resp):
 @dataclass
 class BasicCourseInfoResp(Resp):
     title: str = None
+    alias: str = None
 
 
 @dataclass
