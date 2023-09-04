@@ -50,6 +50,7 @@ class ExerciseDetailsResp(Resp):
     grader_type: GraderType = None
     threshold: int = None
     instructions_html: str = None
+    is_open: bool = None
 
 
 @dataclass
