@@ -84,6 +84,7 @@ class StudentCourseResp(Resp):
 @dataclass
 class SubmissionResp(Resp):
     id: str = None
+    number: int = None
     solution: str = None
     submission_time: str = None
     autograde_status: AutogradeStatus = None
