@@ -60,17 +60,14 @@ class RequestUtil:
         self.auth_server_thread: T.Optional[threading.Thread] = None
 
     def simple_get_request(self, path: str, response_dto_class: T.Type[T.Any]) -> T.Any:
-        dto = self.get_request(path, {200: response_dto_class})
-        assert isinstance(dto, response_dto_class)
-        return dto
+        dto_class = {200: response_dto_class, 204: data.EmptyResp}
 
-    # TODO: refactor to a single underlying request method?
-    def get_request(self, path: str, resp_code_to_dto_class: T.Dict[int, T.Type[T.Any]]) -> T.Any:
         resp: requests.Response = requests.get(self.api_url + path, headers=self.get_token_header(), timeout=TIMEOUT)
+
         if resp.status_code == 401:
             raise AuthRequiredException()
-        dto = util.handle_response(resp, resp_code_to_dto_class)
-        return dto
+
+        return util.handle_response(resp, dto_class)
 
     def post_request(self, path: str, request_dto_dataclass: T.Any,
                      resp_code_to_dto_class: T.Dict[int, T.Type[T.Any]]) -> T.Any:

@@ -3,6 +3,7 @@ import json
 import logging
 import socket
 import typing as T
+from dataclasses import fields
 
 import requests
 
@@ -39,8 +40,19 @@ def handle_response(resp: requests.Response, code_to_dto_class: T.Dict[int, T.Ty
     logging.debug(f"JSON response: {json_response}")
 
     if resp.status_code in code_to_dto_class:
-        response_dto_class = code_to_dto_class[resp.status_code]
-        return response_dto_class(resp.status_code, resp, **json_response)
+        dto_class = code_to_dto_class[resp.status_code]
+
+        # Due to the usage of data classes:
+        # 1. Filter extra fields: avoid X.__init__() got an unexpected keyword argument 'X'
+        # 2. Set missing fields to None: avoid "X.__init__() missing x required positional arguments"
+        filtered_resp = {f.name: json_response.get(f.name, None) for f in fields(dto_class) if
+                         not (f.name in {"resp_code", "response"})}
+
+        if filtered_resp.keys() != json_response.keys():
+            logging.warning(
+                f"Response from {resp.url} differs from expected response. Difference in attributes: {filtered_resp.keys() ^ json_response.keys()}")
+
+        return dto_class(resp_code=resp.status_code, response=resp, **filtered_resp)
 
     else:
         try:

@@ -29,12 +29,10 @@ class ParticipantRole(Enum):
     ALL = "all"
 
 
-# TODO: why do all fields have default values?
-
 @dataclass
 class Resp:
-    resp_code: int = None
-    response: requests.Response = None
+    resp_code: int
+    response: requests.Response
 
 
 @dataclass
@@ -44,79 +42,79 @@ class EmptyResp(Resp):
 
 @dataclass
 class ExerciseDetailsResp(Resp):
-    effective_title: str = None
-    text_html: str = None
-    deadline: str = None
-    grader_type: GraderType = None
-    threshold: int = None
-    instructions_html: str = None
-    is_open: bool = None
+    effective_title: str
+    text_html: str
+    deadline: str
+    grader_type: GraderType
+    threshold: int
+    instructions_html: str
+    is_open: bool
 
 
 @dataclass
 class StudentExercise(Resp):
-    id: str = None
-    effective_title: str = None
-    deadline: str = None
-    status: ExerciseStatus = None
-    grade: int = None
-    graded_by: GraderType = None
-    ordering_idx: int = None
+    id: str
+    effective_title: str
+    deadline: str
+    status: ExerciseStatus
+    grade: int
+    graded_by: GraderType
+    ordering_idx: int
 
 
 @dataclass
 class StudentExerciseResp(Resp):
-    exercises: T.List[StudentExercise] = None
+    exercises: T.List[StudentExercise]
 
 
 @dataclass
 class StudentCourse(Resp):
-    id: str = None
-    title: str = None
-    alias: str = None
+    id: str
+    title: str
+    alias: str
 
 
 @dataclass
 class StudentCourseResp(Resp):
-    courses: T.List[StudentCourse] = None
+    courses: T.List[StudentCourse]
 
 
 @dataclass
 class SubmissionResp(Resp):
-    id: str = None
-    number: int = None
-    solution: str = None
-    submission_time: str = None
-    autograde_status: AutogradeStatus = None
-    grade_auto: int = None
-    feedback_auto: str = None
-    grade_teacher: int = None
-    feedback_teacher: str = None
+    id: str
+    number: int
+    solution: str
+    submission_time: str
+    autograde_status: AutogradeStatus
+    grade_auto: int
+    feedback_auto: str
+    grade_teacher: int
+    feedback_teacher: str
 
 
 @dataclass
 class StudentAllSubmissionsResp(Resp):
-    submissions: T.List[SubmissionResp] = None
-    count: int = None
+    submissions: T.List[SubmissionResp]
+    count: int
 
 
 @dataclass
 class TeacherCourse(Resp):
-    id: str = None
-    title: str = None
-    alias: str = None
-    student_count: int = None
+    id: str
+    title: str
+    alias: str
+    student_count: int
 
 
 @dataclass
 class TeacherCourseResp(Resp):
-    courses: T.List[TeacherCourse] = None
+    courses: T.List[TeacherCourse]
 
 
 @dataclass
 class BasicCourseInfoResp(Resp):
-    title: str = None
-    alias: str = None
+    title: str
+    alias: str
 
 
 @dataclass
@@ -161,17 +159,17 @@ class CourseParticipantsStudentPendingMoodle:
 
 @dataclass
 class TeacherCourseParticipantsResp(Resp):
-    moodle_short_name: str = None
-    moodle_students_synced: bool = None
-    moodle_grades_synced: bool = None
-    student_count: int = None
-    teacher_count: int = None
-    students_pending_count: int = None
-    students_moodle_pending_count: int = None
-    students: T.List[CourseParticipantsStudent] = None
-    teachers: T.List[CourseParticipantsTeacher] = None
-    students_pending: T.List[CourseParticipantsStudentPending] = None
-    students_moodle_pending: T.List[CourseParticipantsStudentPendingMoodle] = None
+    moodle_short_name: str
+    moodle_students_synced: bool
+    moodle_grades_synced: bool
+    student_count: int
+    teacher_count: int
+    students_pending_count: int
+    students_moodle_pending_count: int
+    students: T.List[CourseParticipantsStudent]
+    teachers: T.List[CourseParticipantsTeacher]
+    students_pending: T.List[CourseParticipantsStudentPending]
+    students_moodle_pending: T.List[CourseParticipantsStudentPendingMoodle]
 
 
 @dataclass
@@ -189,7 +187,7 @@ class TeacherCourseExercises:
 
 @dataclass
 class TeacherCourseExercisesResp(Resp):
-    exercises: T.List[TeacherCourseExercises] = None
+    exercises: T.List[TeacherCourseExercises]
 
 
 @dataclass
@@ -205,6 +203,5 @@ class TeacherCourseExerciseSubmissionsStudent:
 
 @dataclass
 class TeacherCourseExerciseSubmissionsStudentResp(Resp):
-    submissions: T.List[TeacherCourseExerciseSubmissionsStudent] = None
-    count: int = None
-
+    submissions: T.List[TeacherCourseExerciseSubmissionsStudent]
+    count: int
