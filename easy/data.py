@@ -256,5 +256,5 @@ class TeacherActivityResp(Resp):
 
 @dataclass
 class TeacherActivities(Resp):
-    activities: T.List[TeacherActivityResp]
+    teacher_activities: T.List[TeacherActivityResp]
 
