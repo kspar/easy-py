@@ -19,8 +19,14 @@ class GraderType(Enum):
 
 class ExerciseStatus(Enum):
     UNSTARTED = "UNSTARTED"
+    UNGRADED = "UNGRADED"
     STARTED = "STARTED"
     COMPLETED = "COMPLETED"
+
+
+class SolutionFileType(Enum):
+    TEXT_EDITOR = "TEXT_EDITOR"
+    TEXT_UPLOAD = "TEXT_UPLOAd"
 
 
 class ParticipantRole(Enum):
@@ -49,16 +55,32 @@ class ExerciseDetailsResp(Resp):
     threshold: int
     instructions_html: str
     is_open: bool
+    solution_file_name: str
+    solution_file_type: SolutionFileType
+
+
+@dataclass
+class GradeResp(Resp):
+    grade: int
+    is_autograde: bool
+    is_graded_directly: bool
+
+
+@dataclass
+class AutomaticAssessmentResp(Resp):
+    grade: int
+    feedback: str
 
 
 @dataclass
 class StudentExercise(Resp):
     id: str
     effective_title: str
+    grader_type: GraderType
     deadline: str
+    is_open: bool
     status: ExerciseStatus
-    grade: int
-    graded_by: GraderType
+    grade: GradeResp
     ordering_idx: int
 
 
@@ -72,6 +94,7 @@ class StudentCourse(Resp):
     id: str
     title: str
     alias: str
+    archived: bool
 
 
 @dataclass
@@ -86,16 +109,14 @@ class SubmissionResp(Resp):
     solution: str
     submission_time: str
     autograde_status: AutogradeStatus
-    grade_auto: int
-    feedback_auto: str
-    grade_teacher: int
-    feedback_teacher: str
+    grade: GradeResp
+    submission_status: ExerciseStatus
+    auto_assessment: AutomaticAssessmentResp
 
 
 @dataclass
 class StudentAllSubmissionsResp(Resp):
     submissions: T.List[SubmissionResp]
-    count: int
 
 
 @dataclass
@@ -103,6 +124,7 @@ class TeacherCourse(Resp):
     id: str
     title: str
     alias: str
+    archived: bool
     student_count: int
 
 
@@ -115,6 +137,7 @@ class TeacherCourseResp(Resp):
 class BasicCourseInfoResp(Resp):
     title: str
     alias: str
+    archived: bool
 
 
 @dataclass
@@ -141,7 +164,6 @@ class CourseParticipantsTeacher:
     given_name: str
     family_name: str
     created_at: str
-    groups: T.List[CourseGroup]
 
 
 @dataclass
@@ -153,19 +175,13 @@ class CourseParticipantsStudentPending:
 
 @dataclass
 class CourseParticipantsStudentPendingMoodle:
-    ut_username: str
+    moodle_username: str
+    email: str
     groups: T.List[CourseGroup]
 
 
 @dataclass
 class TeacherCourseParticipantsResp(Resp):
-    moodle_short_name: str
-    moodle_students_synced: bool
-    moodle_grades_synced: bool
-    student_count: int
-    teacher_count: int
-    students_pending_count: int
-    students_moodle_pending_count: int
     students: T.List[CourseParticipantsStudent]
     teachers: T.List[CourseParticipantsTeacher]
     students_pending: T.List[CourseParticipantsStudentPending]
@@ -174,15 +190,23 @@ class TeacherCourseParticipantsResp(Resp):
 
 @dataclass
 class TeacherCourseExercises:
-    id: str
+    course_exercise_id: str
+    exercise_id: str
+    library_title: str
+    title_alias: str
     effective_title: str
+    grade_threshold: int
+    student_visible: bool
+    student_visible_from: str
     soft_deadline: str
+    hard_deadline: str
     grader_type: GraderType
     ordering_idx: int
     unstarted_count: int
     ungraded_count: int
     started_count: int
     completed_count: int
+    # latest_submissions: T.List[SubmissionRow] TODO:  #out of date as of 02.08.2024. Implement data class SubmissionRow.
 
 
 @dataclass
