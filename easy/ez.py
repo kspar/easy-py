@@ -285,6 +285,15 @@ class Student:
         path = f"/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/latest/await"
         return self.request_util.simple_get_request(path, data.SubmissionResp)
 
+    def get_all_exercise_teacher_activities(self, course_id: str, course_exercise_id: str) -> data.TeacherActivities:
+        """
+        GET all teacher activities for this exercise
+        """
+        logging.debug(f"GET teacher activities on course '{course_id}' exercise '{course_exercise_id}'")
+        util.assert_not_none(course_id, course_exercise_id)
+        path = f"/student/courses/{course_id}/exercises/{course_exercise_id}/activities"
+        return self.request_util.simple_get_request(path, data.TeacherActivities)
+
     def get_all_submissions(self, course_id: str, course_exercise_id: str) -> data.StudentAllSubmissionsResp:
         """
         GET submissions to this course exercise.

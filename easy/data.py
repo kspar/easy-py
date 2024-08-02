@@ -229,3 +229,32 @@ class TeacherCourseExerciseSubmissionsStudent:
 class TeacherCourseExerciseSubmissionsStudentResp(Resp):
     submissions: T.List[TeacherCourseExerciseSubmissionsStudent]
     count: int
+
+
+@dataclass
+class FeedbackResp(Resp):
+    feedback_html: str
+    feedback_adoc: str
+
+
+@dataclass
+class TeacherResp(Resp):
+    id: str
+    given_name: str
+    family_name: str
+
+
+@dataclass
+class TeacherActivityResp(Resp):
+    id: str
+    submission_id: str
+    submission_number: int
+    created_at: str
+    grade: int
+    edited_at: str
+    feedback: FeedbackResp
+
+@dataclass
+class TeacherActivities(Resp):
+    activities: T.List[TeacherActivityResp]
+
