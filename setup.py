@@ -5,9 +5,10 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="easy-py",
-    version="0.6.1",
+    version="0.6.2",
     author="Kaspar Papli",
     author_email="kaspar.papli@gmail.com",
+    license="MIT",
     description="Python SDK for Easy",
     long_description=long_description,
     long_description_content_type="text/markdown",
