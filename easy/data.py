@@ -253,6 +253,7 @@ class TeacherActivityResp(Resp):
     grade: int
     edited_at: str
     feedback: FeedbackResp
+    teacher: TeacherResp
 
 @dataclass
 class TeacherActivities(Resp):
