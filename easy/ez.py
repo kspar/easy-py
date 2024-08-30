@@ -276,14 +276,14 @@ class Student:
         path = f"/student/courses/{course_id}/exercises/{course_exercise_id}"
         return self.request_util.simple_get_request(path, data.ExerciseDetailsResp)
 
-    def get_latest_exercise_submission_details(self, course_id: str, course_exercise_id: str) -> data.SubmissionResp:
+    def await_latest_exercise_submission_details(self, course_id: str, course_exercise_id: str) -> None:
         """
         GET and wait for the latest submission's details to the specified course exercise.
         """
         logging.debug(f"GET latest submission's details to the '{course_id}' exercise '{course_exercise_id}'")
         util.assert_not_none(course_id, course_exercise_id)
         path = f"/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/latest/await"
-        return self.request_util.simple_get_request(path, data.SubmissionResp)
+        self.request_util.simple_get_request(path, data.SubmissionResp)
 
     def get_all_exercise_teacher_activities(self, course_id: str, course_exercise_id: str) -> data.TeacherActivities:
         """
