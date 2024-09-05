@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="easy-py",
-    version="0.7.2",
+    version="0.7.3",
     author="Kaspar Papli",
     author_email="kaspar.papli@gmail.com",
     license="MIT",
@@ -19,7 +19,7 @@ setuptools.setup(
     },
     install_requires=[
         'flask~=2.0.3',
-        'requests~=2.28.2',
+        'requests>=2.28.2,<2.32.4',
         'werkzeug~=2.0.0'
     ],
     classifiers=[
