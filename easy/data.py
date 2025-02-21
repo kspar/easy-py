@@ -95,6 +95,7 @@ class StudentCourse(Resp):
     title: str
     alias: str
     archived: bool
+    last_accessed: str
 
 
 @dataclass

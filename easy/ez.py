@@ -303,6 +303,17 @@ class Student:
         path = f"/student/courses/{course_id}/exercises/{course_exercise_id}/submissions/all"
         return self.request_util.simple_get_request(path, data.StudentAllSubmissionsResp)
 
+    def set_student_last_access(self, course_id: str):
+        logging.debug(f"POST set student last access  to course '{course_id}'")
+        util.assert_not_none(course_id)
+
+        @dataclass
+        class EmptyReq:
+            pass
+
+        path = f"/student/courses/{course_id}/access"
+        return self.request_util.post_request(path, EmptyReq(),{200: data.EmptyResp})
+
     def post_submission(self, course_id: str, course_exercise_id: str, solution: str) -> int:
         """
         POST submission to this course exercise.
