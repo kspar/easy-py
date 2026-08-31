@@ -1,6 +1,8 @@
 import base64
+import hashlib
 import json
 import logging
+import secrets
 import socket
 import typing as T
 from dataclasses import fields
@@ -63,6 +65,17 @@ def handle_response(resp: requests.Response, code_to_dto_class: T.Dict[int, T.Ty
             nested_exception = e
 
         raise ErrorResponseException(resp, error_rsp, nested_exception)
+
+
+def pkce_s256_challenge(verifier: str) -> str:
+    # RFC 7636: BASE64URL(SHA256(ASCII(verifier))) without padding
+    return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode('ascii')).digest()).rstrip(b'=').decode('ascii')
+
+
+def generate_pkce_pair() -> T.Tuple[str, str]:
+    # token_urlsafe(64) gives 86 chars, within RFC 7636's 43-128 limit and its allowed alphabet
+    verifier = secrets.token_urlsafe(64)
+    return verifier, pkce_s256_challenge(verifier)
 
 
 def normalise_url(url: str) -> str:

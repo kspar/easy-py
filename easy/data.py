@@ -233,12 +233,6 @@ class TeacherCourseExerciseSubmissionsStudentResp(Resp):
 
 
 @dataclass
-class FeedbackResp(Resp):
-    feedback_html: str
-    feedback_adoc: str
-
-
-@dataclass
 class TeacherResp(Resp):
     id: str
     given_name: str
@@ -251,12 +245,35 @@ class TeacherActivityResp(Resp):
     submission_id: str
     submission_number: int
     created_at: str
-    grade: int
-    edited_at: str
-    feedback: FeedbackResp
+    grade: int  # nullable
+    edited_at: str  # nullable
+    feedback_md: str  # nullable
+    feedback_html: str  # nullable
     teacher: TeacherResp
+
 
 @dataclass
 class TeacherActivities(Resp):
     teacher_activities: T.List[TeacherActivityResp]
+
+
+@dataclass
+class InlineComment:
+    id: str
+    submission_id: str
+    submission_number: int
+    teacher: TeacherResp  # {id, given_name, family_name}
+    created_at: str  # yyyy-MM-dd'T'HH:mm:ss'Z'
+    edited_at: str  # nullable
+    line_start: int
+    line_end: int
+    code: str  # the code the comment was anchored to, as it was when the teacher commented
+    text_md: str
+    text_html: str
+    suggested_code: str  # nullable; non-null means the comment is a suggestion
+
+
+@dataclass
+class InlineCommentsResp(Resp):
+    inline_comments: T.List[InlineComment]
 

@@ -1,17 +1,19 @@
 import dataclasses
 import logging
 import pathlib
-import sys
+import secrets
 import threading
 import time
 import typing as T
 import webbrowser
 from dataclasses import dataclass
 from enum import Enum
+from urllib.parse import urlencode
 
 import requests
-from flask import Flask, request, Response, render_template
+from flask import Flask, request, Response, render_template, redirect
 from requests import RequestException
+from werkzeug.serving import make_server
 
 from . import data, util
 from .exceptions import AuthRequiredException
@@ -41,6 +43,8 @@ class RequestUtil:
                  api_url: str,
                  idp_url: str,
                  idp_client_name: str,
+                 idp_realm_path: str,
+                 logout_redirect_url: str,
                  auth_token_min_valid_sec: int,
                  auth_browser_success_msg: str,
                  auth_browser_fail_msg: str,
@@ -50,11 +54,18 @@ class RequestUtil:
         self.api_url = api_url
         self.idp_url = idp_url
         self.idp_client_name = idp_client_name
+        self.idp_realm_path = idp_realm_path
+        self.logout_redirect_url = logout_redirect_url
         self.auth_token_min_valid_sec = auth_token_min_valid_sec
         self.auth_browser_success_msg = auth_browser_success_msg
         self.auth_browser_fail_msg = auth_browser_fail_msg
         self.retrieve_token = retrieve_token
         self.persist_token = persist_token
+
+        oidc_base = f'{idp_url}{idp_realm_path}/protocol/openid-connect'
+        self.idp_auth_url = oidc_base + '/auth'
+        self.idp_token_url = oidc_base + '/token'
+        self.idp_logout_url = oidc_base + '/logout'
 
         self.auth_server_port: T.Optional[int] = None
         self.auth_server_thread: T.Optional[threading.Thread] = None
@@ -113,36 +124,36 @@ class RequestUtil:
             'client_id': self.idp_client_name
         }
 
-        r = requests.post(f"{self.idp_url}/auth/realms/master/protocol/openid-connect/token", data=token_req_body,
-                          timeout=TIMEOUT)
+        r = requests.post(self.idp_token_url, data=token_req_body, timeout=TIMEOUT)
 
         if r.status_code == 200:
-            body = r.json()
-            access_token = StorableToken(TokenType.ACCESS, body["access_token"],
-                                         round(time.time()) + int(body['expires_in']))
-            refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
-                                          round(time.time()) + int(body['refresh_expires_in']))
-
-            self.set_stored_token(TokenType.ACCESS, access_token)
-            self.set_stored_token(TokenType.REFRESH, refresh_token)
+            self._persist_tokens_from_idp_body(r.json())
             logging.info("Refreshed tokens using refresh token")
             return True
         else:
             logging.info(f"Refreshing tokens failed with status {r.status_code}")
             return False
 
-    def start_auth_in_browser(self):
+    def _persist_tokens_from_idp_body(self, body: dict):
+        access_token = StorableToken(TokenType.ACCESS, body["access_token"],
+                                     round(time.time()) + int(body['expires_in']))
+        refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
+                                      round(time.time()) + int(body['refresh_expires_in']))
+
+        self.set_stored_token(TokenType.ACCESS, access_token)
+        self.set_stored_token(TokenType.REFRESH, refresh_token)
+
+    def _create_auth_app(self, port: int, shutdown_server: T.Callable[[], None]) -> Flask:
         templates_path = str((pathlib.Path(__file__).parent / 'auth-templates').resolve())
         app = Flask(__name__, template_folder=templates_path)
-        # Disable Flask banner
-        cli = sys.modules['flask.cli']
-        cli.show_server_banner = lambda *x: None
 
-        def shutdown_server():
-            func = request.environ.get('werkzeug.server.shutdown')
-            if func is None:
-                raise RuntimeError('Not running with the Werkzeug Server')
-            func()
+        # The redirect URI sent to the token endpoint must be byte-identical to the one used in the
+        # authorization request, and the callback clears self.auth_server_port before exchanging,
+        # so both are captured here instead of being rebuilt from self inside the handlers.
+        redirect_uri = f'http://{AUTH_SERVER_HOST}:{port}/login'
+        # state -> code_verifier; one entry per opened login page, popped on use.
+        # The server is single-threaded (make_server without threaded=True), so no locking is needed.
+        pending_states: T.Dict[str, str] = {}
 
         @app.route('/shutdown', methods=['POST'])
         def controller_shutdown():
@@ -150,41 +161,100 @@ class RequestUtil:
             shutdown_server()
             return Response(status=200)
 
-        @app.route('/keycloak.json')
-        def controller_keycloak_conf():
-            return render_template("keycloak.json", idp_url=self.idp_url, client_name=self.idp_client_name)
+        @app.route('/health')
+        def controller_health():
+            return Response(status=200)
 
         @app.route('/login')
         def controller_login():
-            return render_template("login.html", idp_url=self.idp_url, port=self.auth_server_port,
-                                   success_msg=self.auth_browser_success_msg, fail_msg=self.auth_browser_fail_msg)
+            if 'code' not in request.args and 'error' not in request.args:
+                # Fresh login: send the browser to the IdP with a new state + PKCE pair
+                verifier, challenge = util.generate_pkce_pair()
+                state = secrets.token_urlsafe(32)
+                pending_states[state] = verifier
+                return redirect(self.idp_auth_url + '?' + urlencode({
+                    'client_id': self.idp_client_name,
+                    'redirect_uri': redirect_uri,
+                    'response_type': 'code',
+                    'scope': 'openid',
+                    'state': state,
+                    'code_challenge': challenge,
+                    'code_challenge_method': 'S256',
+                }))
 
-        @app.route('/deliver-tokens', methods=['POST'])
-        def controller_deliver_tokens():
+            # OAuth callback: this request ends the auth server, whatever the outcome.
+            # Clear server first to decrease the race condition window
+            self.clear_server()
+
+            def fail_page():
+                return render_template('auth-result.html', message=self.auth_browser_fail_msg, close_window=False)
+
             try:
-                # Clear server first to decrease the race condition window
-                self.clear_server()
+                if 'error' in request.args:
+                    logging.info(f"Authentication failed: {request.args.get('error')} "
+                                 f"({request.args.get('error_description')})")
+                    return fail_page()
 
-                if request.is_json:
-                    body = request.get_json()
-                    access_token = StorableToken(TokenType.ACCESS, body["access_token"],
-                                                 round(time.time()) + int(body['access_token_valid_sec']))
-                    refresh_token = StorableToken(TokenType.REFRESH, body["refresh_token"],
-                                                  round(time.time()) + int(body['refresh_token_valid_sec']))
-                    self.set_stored_token(TokenType.ACCESS, access_token)
-                    self.set_stored_token(TokenType.REFRESH, refresh_token)
-                    return Response(status=200)
-                else:
-                    return Response(status=400)
+                verifier = pending_states.pop(request.args.get('state'), None)
+                code = request.args.get('code')
+                if verifier is None or not code:
+                    logging.info('Authentication failed: unknown state or missing code')
+                    return fail_page()
+
+                r = requests.post(self.idp_token_url, data={
+                    'grant_type': 'authorization_code',
+                    'client_id': self.idp_client_name,
+                    'code': code,
+                    'redirect_uri': redirect_uri,
+                    'code_verifier': verifier,
+                }, timeout=TIMEOUT)
+
+                if r.status_code != 200:
+                    # The failure body is an error JSON; a success body would contain tokens - never log that
+                    logging.info(f'Token exchange failed with status {r.status_code}: {r.text}')
+                    return fail_page()
+
+                self._persist_tokens_from_idp_body(r.json())
+                return render_template('auth-result.html', message=self.auth_browser_success_msg, close_window=True)
+            except Exception as e:
+                logging.warning(f'Token exchange failed: {repr(e)}')
+                return fail_page()
             finally:
                 shutdown_server()
 
+        return app
+
+    def start_auth_in_browser(self):
         # Set and start server thread if it's not already running
         if not self.is_server_active():
             logging.debug('Auth server not active, starting it')
-            self.auth_server_port = util.get_free_port()
-            self.auth_server_thread = threading.Thread(target=app.run,
-                                                       args=(AUTH_SERVER_HOST, self.auth_server_port, False, False))
+            port = util.get_free_port()
+
+            # The routes need to be able to stop the server, and the server needs the app that holds
+            # those routes, so the reference is handed over through a holder.
+            server_holder: T.Dict[str, T.Any] = {}
+
+            def shutdown_server():
+                server = server_holder.get('server')
+                if server is None:
+                    return
+                # shutdown() returns once the serving loop has stopped, and the loop cannot stop
+                # while this request is still being handled - so ask for it from another thread
+                threading.Thread(target=server.shutdown, daemon=True).start()
+
+            app = self._create_auth_app(port, shutdown_server)
+            # threaded=False keeps handlers serialized, which pending_states relies on
+            server = make_server(AUTH_SERVER_HOST, port, app, threaded=False)
+            server_holder['server'] = server
+
+            def serve():
+                try:
+                    server.serve_forever()
+                finally:
+                    server.server_close()
+
+            self.auth_server_port = port
+            self.auth_server_thread = threading.Thread(target=serve)
             logging.debug('Starting server thread')
             self.auth_server_thread.start()
             logging.debug('Server thread started')
@@ -192,13 +262,15 @@ class RequestUtil:
             logging.debug('Auth server already active')
 
         login_url = f'http://{AUTH_SERVER_HOST}:{self.auth_server_port}/login'
+        health_url = f'http://{AUTH_SERVER_HOST}:{self.auth_server_port}/health'
 
-        # Wait until server has started
+        # Wait until server has started. Polling /login would generate a pending state per poll
+        # and would return a 302, so a dedicated health endpoint is polled instead.
         for _ in range(AUTH_SERVER_START_POLL_MAX_RETRIES):
             time.sleep(AUTH_SERVER_START_POLL_DELAY_SEC)
             logging.debug('Checking if auth server is ready to serve...')
             try:
-                status = requests.head(login_url).status_code
+                status = requests.head(health_url, timeout=2).status_code
                 if status == 200:
                     logging.debug('Auth server is ready')
                     break
@@ -294,6 +366,16 @@ class Student:
         path = f"/student/courses/{course_id}/exercises/{course_exercise_id}/activities"
         return self.request_util.simple_get_request(path, data.TeacherActivities)
 
+    def get_inline_comments(self, course_id: str, course_exercise_id: str) -> data.InlineCommentsResp:
+        """
+        GET teachers' inline comments on the authenticated student's submissions to this course exercise.
+        Comments span all submissions; use submission_number to tell them apart.
+        """
+        logging.debug(f"GET inline comments on course '{course_id}' exercise '{course_exercise_id}'")
+        util.assert_not_none(course_id, course_exercise_id)
+        path = f"/student/courses/{course_id}/exercises/{course_exercise_id}/inline-comments"
+        return self.request_util.simple_get_request(path, data.InlineCommentsResp)
+
     def get_all_submissions(self, course_id: str, course_exercise_id: str) -> data.StudentAllSubmissionsResp:
         """
         GET submissions to this course exercise.
@@ -386,10 +468,16 @@ class Ez:
                  auth_token_min_valid_sec: int = 20,
                  auth_browser_success_msg: str = "Authentication was successful! You can now close this page.",
                  auth_browser_fail_msg: str = "Something failed... did you try turning it off and on again?",
-                 logging_level: int = logging.INFO):
+                 logging_level: int = logging.INFO,
+                 idp_realm_path: str = '/auth/realms/master',
+                 logout_redirect_url: T.Optional[str] = None):
         """
         TODO: doc
         :param logging_level: default logging level, e.g. logging.DEBUG. Default: logging.INFO
+        :param idp_realm_path: path of the Keycloak realm on the IdP host; OIDC endpoints are derived as
+        {idp_url}{idp_realm_path}/protocol/openid-connect/{auth,token,logout}. Default: /auth/realms/master
+        :param logout_redirect_url: where the browser is sent after logout (must be registered as a valid
+        post-logout redirect URI on the IdP client). Default: https://{idp_client_name}
         """
         # Both must be either None or defined
         if (retrieve_token is None) != (persist_token is None):
@@ -411,8 +499,13 @@ class Ez:
 
         versioned_api_url = util.normalise_url(api_base_url) + API_VERSION_PREFIX
         normalised_idp_url = util.normalise_url(idp_url)
+        stripped_realm_path = idp_realm_path.strip().strip('/')
+        normalised_realm_path = f'/{stripped_realm_path}' if stripped_realm_path else ''
+        if logout_redirect_url is None:
+            logout_redirect_url = f'https://{idp_client_name}'
 
         self.util = RequestUtil(versioned_api_url, normalised_idp_url, idp_client_name,
+                                normalised_realm_path, logout_redirect_url,
                                 auth_token_min_valid_sec,
                                 auth_browser_success_msg.strip().replace('\n', ''),
                                 auth_browser_fail_msg.strip().replace('\n', ''),
@@ -482,7 +575,9 @@ class Ez:
     def logout_in_browser(self):
         self.util.set_stored_token(TokenType.ACCESS, None)
         self.util.set_stored_token(TokenType.REFRESH, None)
-        webbrowser.open(
-            f"{self.util.idp_url}/auth/realms/master/protocol/openid-connect/logout"
-            f"?redirect_uri=https%3A%2F%2F{self.util.idp_client_name}"
-        )
+        # Without an id_token_hint, Keycloak honours post_logout_redirect_uri only together with
+        # client_id, and shows a one-click logout confirmation page first.
+        webbrowser.open(self.util.idp_logout_url + '?' + urlencode({
+            'client_id': self.util.idp_client_name,
+            'post_logout_redirect_uri': self.util.logout_redirect_url,
+        }))

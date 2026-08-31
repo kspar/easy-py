@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+
+<body>
+<div id="container">{{ message }}</div>
+{% if close_window %}
+<script>window.close();</script>
+{% endif %}
+</body>
+</html>
