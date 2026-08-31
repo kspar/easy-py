@@ -80,16 +80,13 @@ python -m unittest discover -s tests -v
 
 What that cannot reach is the real socket, `serve_forever`, and the shutdown handshake — when touching server lifecycle, exercise those for real: start the server, hit it over HTTP, assert the thread exits.
 
-**Test against Thonny's own interpreter, not just a local Python** — that is where the Werkzeug breakage was hiding:
-
-```bash
-"C:/Program Files/Thonny/python.exe" -m venv venv314
-```
+**Test against Thonny's bundled interpreter, not just a system Python** — that is where the Werkzeug breakage was hiding. Thonny ships its own Python (5.x bundles 3.14); make a venv from the interpreter inside the Thonny installation and run the suite there.
 
 ## Release
 
 1. Bump `version` in `setup.py`; keep `../easy-thonny/setup.py`'s `easy-py>=...` pin in step.
 2. Clear `build/` before building, or files deleted since the last build leak into the wheel.
+   If `egg_info` fails with a file-lock or permission error — common on Windows when a sync client, indexer or antivirus is holding the tree — build from a copy in a plain local directory and move the artifacts back into `dist/`.
 3. Publish easy-py **before** thonny-lahendus — the plugin's metadata requires the new SDK.
 
 Both `dist/` folders keep older releases, so `twine upload dist/*` (what `publish.cmd` does) tries to re-upload already-published files and fails. Scope it to the new version:
@@ -97,11 +94,6 @@ Both `dist/` folders keep older releases, so `twine upload dist/*` (what `publis
 ```bash
 python -m twine upload dist/easy_py-0.8.0*
 ```
-
-## Environment quirks on this machine
-
-- `python` is not on PATH (it resolves to the Microsoft Store alias); use a full interpreter path.
-- Building inside Dropbox can fail with `WinError 5`, because Dropbox holds locks during `egg_info`. Build from a copy outside Dropbox and move the artifacts back into `dist/`.
 
 ## Background
 
