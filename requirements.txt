@@ -1,4 +1,6 @@
-
-flask~=2.0.3
-requests>=2.28.2,<2.32.4
-werkzeug~=2.0.0
+# Dev setup:  pip install -r requirements.txt
+#
+# Installs this package in editable mode and takes its dependencies from
+# setup.py, so there is no second copy of the version floors to keep in sync.
+# Note the floors there are deliberate: Werkzeug 2.0 cannot run on Python 3.12+.
+-e .

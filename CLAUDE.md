@@ -70,6 +70,8 @@ curl -s -o /dev/null -w "authorize: %{http_code}\n" "https://idp.lahendus.ut.ee/
 
 Python floor is 3.9.
 
+`requirements.txt` is only a dev convenience: it is a single `-e .`, so `pip install -r requirements.txt` gives an editable install and the dependencies come from `setup.py`. It deliberately holds no version list of its own — the duplicate it used to carry sat at `werkzeug~=2.0.0` well after that pin was removed here.
+
 ## Testing
 
 ```bash
