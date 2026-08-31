@@ -87,15 +87,20 @@ What that cannot reach is the real socket, `serve_forever`, and the shutdown han
 ## Release
 
 1. Bump `version` in `setup.py`; keep `../easy-thonny/setup.py`'s `easy-py>=...` pin in step.
-2. Clear `build/` before building, or files deleted since the last build leak into the wheel.
-   If `egg_info` fails with a file-lock or permission error — common on Windows when a sync client, indexer or antivirus is holding the tree — build from a copy in a plain local directory and move the artifacts back into `dist/`.
+2. Build, then upload that one version:
+
+   ```bash
+   build.cmd
+   publish.cmd 0.8.0
+   ```
+
 3. Publish easy-py **before** thonny-lahendus — the plugin's metadata requires the new SDK.
 
-Both `dist/` folders keep older releases, so `twine upload dist/*` (what `publish.cmd` does) tries to re-upload already-published files and fails. Scope it to the new version:
+Both scripts invoke Python through the `py` launcher rather than `python`, because on Windows `python` frequently resolves to the Microsoft Store alias stub, which reports that Python was not found instead of running. They also install `build` / `twine` on demand, since neither is present by default.
 
-```bash
-python -m twine upload dist/easy_py-0.8.0*
-```
+`build.cmd` builds from a staged copy under `%TEMP%`, not in place: building in the working tree fails with `Access is denied` on `egg_info` whenever a file-syncing client, indexer or antivirus is holding it. Staging also means files deleted since the last build cannot reach the wheel — `build/` and `*.egg-info` are never copied across, which is how the retired auth templates would otherwise have shipped in 0.8.0.
+
+`publish.cmd` takes the version and uploads only that release, after a `twine check`. `dist/` keeps every earlier build and PyPI refuses a file that already exists, so an unscoped `twine upload dist/*` fails on the old files before reaching the new one.
 
 ## Background
 
